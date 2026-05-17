@@ -2331,7 +2331,7 @@ const calculateScore = (v) => {
 };
 
 app.get('/check-version', async (req, res) => {
-    const remoteUrl = 'https://raw.githubusercontent.com/raku-ringo/MIN-Tube-Pro/refs/heads/main/public/raw/version.json';
+    const remoteUrl = 'https://raw.githubusercontent.com/mino-hobby-pro/MIN-Tube-Pro/refs/heads/main/public/raw/version.json';
     const localPath = path.join(__dirname, 'public', 'raw', 'version.json');
 
     try {
