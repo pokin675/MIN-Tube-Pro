@@ -2294,7 +2294,7 @@ app.get("/short-check/:id", async (req, res) => {
 });
 
 
-app.get("/api/light-search", async (req, res, next) => {
+app.get("/api/1-search", async (req, res, next) => {
   const query = req.query.q;
   const startPage = Number(req.query.page) || 0;
 
@@ -2303,23 +2303,21 @@ app.get("/api/light-search", async (req, res, next) => {
   }
 
   try {
-    const maxPages = 5; 
+    const maxPages = 5;
     let foundVideo = null;
 
     for (let page = startPage; page < startPage + maxPages; page++) {
       const results = await yts.GetListByKeyword(query, false, 20, page);
 
       const items = Array.isArray(results?.items) ? results.items : [];
+
       for (const item of items) {
-        const id = item?.id || item?.videoId || "";
-        const type = item?.type || "";
+        const id = String(item?.id || "");
 
-        if (type === "channel" || String(id).startsWith("UC")) continue;
+        if (id.startsWith("UC")) continue;
 
-        if (type === "video" || item?.videoId || (id && !String(id).startsWith("UC"))) {
-          foundVideo = item;
-          break;
-        }
+        foundVideo = item;
+        break;
       }
 
       if (foundVideo) break;
@@ -2330,6 +2328,7 @@ app.get("/api/light-search", async (req, res, next) => {
     }
 
     res.json(foundVideo);
+
   } catch (err) {
     next(err);
   }
