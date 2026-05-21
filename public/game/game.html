@@ -3,35 +3,30 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Games — MIN-Tube-Pro Ranking</title>
-  
-  <!-- Supabase SDK -->
+  <title>Games — MIN-Tube-Pro</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
   <style>
     :root{
       --bg1:#0f1724; --bg2:#071029; --accent:#00d4ff;
       --glass:rgba(255,255,255,0.06); --card:rgba(255,255,255,0.03);
       --glass-border:rgba(255,255,255,0.08); --radius:14px;
       --glass-blur:10px; --text:#e6f7ff; --muted:#9fb7c9;
+      --gold: #ffd700; --silver: #c0c0c0; --bronze: #cd7f32;
     }
     *{box-sizing:border-box;margin:0;padding:0}
-    html,body{height:100%;font-family:"Noto Sans JP",sans-serif;background:linear-gradient(135deg,var(--bg1),var(--bg2));color:var(--text);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+    html,body{height:100%;font-family:"Noto Sans JP",sans-serif;background:linear-gradient(135deg,var(--bg1),var(--bg2));color:var(--text);-webkit-font-smoothing:antialiased}
 
     .wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:32px 20px 60px;gap:24px}
     .inner{width:100%;max-width:1100px}
 
-    /* ── 戻るボタン ── */
+    /* 戻るボタン */
     .back-btn{
-      display:inline-flex;align-items:center;gap:8px;
-      color:var(--muted);font-size:13px;text-decoration:none;
-      padding:7px 14px;border-radius:8px;
-      border:1px solid var(--glass-border);background:var(--card);
-      transition:all .18s;cursor:pointer;
+      display:inline-flex;align-items:center;gap:8px;color:var(--muted);font-size:13px;text-decoration:none;
+      padding:7px 14px;border-radius:8px;border:1px solid var(--glass-border);background:var(--card);transition:all .18s;cursor:pointer;
     }
     .back-btn:hover{color:var(--accent);background:rgba(0,212,255,0.07)}
 
-    /* ── ヒーロー ── */
+    /* ヒーロー */
     .hero{
       display:flex;align-items:center;justify-content:space-between;gap:20px;
       background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));
@@ -44,17 +39,16 @@
       font-size:32px;background:linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02));
       border:1px solid var(--glass-border);box-shadow:0 6px 18px rgba(0,0,0,0.5);
     }
-    .title{font-size:20px;font-weight:700}
     .tagline{font-size:14px;color:var(--accent);display:flex;align-items:center;gap:8px;margin-top:4px}
     .spark{width:8px;height:8px;border-radius:50%;background:#00d4ff;box-shadow:0 0 10px #00d4ff;animation:pulse 2s infinite}
     @keyframes pulse{0%,100%{transform:scale(0.8);opacity:0.5}50%{transform:scale(1.2);opacity:1}}
 
-    /* ── ツールバー ── */
+    /* ツールバー */
     .toolbar{display:flex;flex-direction:column;gap:12px}
     .search-wrap{position:relative}
     #searchInput{
-      width:100%;padding:12px 16px 12px 42px;background:var(--card);
-      border:1px solid var(--glass-border);border-radius:10px;color:var(--text);outline:none;
+      width:100%;padding:12px 16px 12px 42px;background:var(--card);border:1px solid var(--glass-border);
+      border-radius:10px;color:var(--text);outline:none;font-family:inherit;
     }
     .search-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:18px;stroke:var(--muted);fill:none;stroke-width:2}
 
@@ -67,55 +61,65 @@
     .filter-tab.active{background:rgba(0,212,255,0.15);color:var(--accent);border-color:var(--accent)}
 
     .sort-wrap{display:flex;align-items:center;gap:8px}
-    #sortSelect{background:var(--card);color:var(--text);border:1px solid var(--glass-border);padding:6px;border-radius:8px;outline:none}
-
-    /* ── 表示切り替え ── */
+    #sortSelect{background:var(--card);color:var(--text);border:1px solid var(--glass-border);padding:6px 10px;border-radius:8px;outline:none;cursor:pointer}
     .view-toggle{display:flex;gap:4px}
-    .view-btn{width:34px;height:34px;background:var(--card);border:1px solid var(--glass-border);border-radius:8px;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center}
+    .view-btn{width:36px;height:34px;background:var(--card);border:1px solid var(--glass-border);border-radius:8px;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center}
     .view-btn.active{color:var(--accent);border-color:var(--accent);background:rgba(0,212,255,0.1)}
 
-    /* ── グリッド ── */
+    /* グリッド */
     .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px}
     .grid.list-view{display:flex;flex-direction:column}
 
-    /* ── ゲームカード ── */
+    /* ゲームカード */
     .game-card{
       background:var(--card);border:1px solid var(--glass-border);border-radius:12px;
-      overflow:hidden;transition:all .3s ease;cursor:pointer;display:flex;flex-direction:column;
+      overflow:hidden;transition:all .3s cubic-bezier(0.4, 0, 0.2, 1);cursor:pointer;display:flex;flex-direction:column;position:relative;
     }
     .game-card:hover{transform:translateY(-5px);border-color:var(--accent);box-shadow:0 10px 30px rgba(0,0,0,0.4)}
-    
-    .thumb{position:relative;height:140px;background:rgba(0,0,0,0.2);display:flex;align-items:center;justify-content:center;overflow:hidden}
-    .thumb img{width:100%;height:100%;object-fit:cover}
-    .big-icon{font-size:50px}
-    .play-overlay{position:absolute;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;opacity:0;transition:0.2s}
-    .game-card:hover .play-overlay{opacity:1}
-    .play-btn{width:50px;height:50px;background:var(--accent);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#000;font-size:20px;box-shadow:0 0 20px var(--accent)}
 
-    .card-body{padding:15px;display:flex;flex-direction:column;gap:8px;flex:1}
-    .card-title-row{display:flex;justify-content:space-between;align-items:center}
-    .card-title{font-weight:700;font-size:16px}
-    .play-count{font-size:11px;background:rgba(0,212,255,0.1);padding:2px 8px;border-radius:10px;color:var(--accent);font-weight:bold}
+    /* ランク演出 */
+    .rank-tag{
+      position:absolute;top:0;left:10px;z-index:10;width:32px;height:40px;
+      display:none;align-items:center;justify-content:center;font-size:20px;
+      clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 50% 80%, 0% 100%);
+      font-weight: bold;box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+    .rank-1 .rank-tag{display:flex; background:linear-gradient(to bottom, #fff38a, var(--gold)); color:#725a00;}
+    .rank-2 .rank-tag{display:flex; background:linear-gradient(to bottom, #e0e0e0, var(--silver)); color:#333;}
+    .rank-3 .rank-tag{display:flex; background:linear-gradient(to bottom, #f3ad8a, var(--bronze)); color:#522a15;}
     
-    .card-desc{font-size:13px;color:var(--muted);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    .rank-1 { border-color: rgba(255, 215, 0, 0.4); }
+    .rank-1::after { content:'TOP'; position:absolute; top:45px; left:10px; font-size:9px; color:var(--gold); font-weight:bold; letter-spacing:1px; }
+
+    .thumb{position:relative;height:145px;background:rgba(0,0,0,0.2);display:flex;align-items:center;justify-content:center;overflow:hidden}
+    .thumb img{width:100%;height:100%;object-fit:cover}
+    .big-icon{font-size:55px;transition:transform .3s}
+    .game-card:hover .big-icon{transform:scale(1.1) rotate(-3deg)}
+    
+    .play-overlay{position:absolute;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;opacity:0;transition:0.2s;backdrop-filter:blur(2px)}
+    .game-card:hover .play-overlay{opacity:1}
+    .play-btn{width:54px;height:54px;background:var(--accent);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#000;font-size:22px;box-shadow:0 0 20px var(--accent)}
+
+    .card-body{padding:16px;display:flex;flex-direction:column;gap:8px;flex:1}
+    .card-title-row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+    .card-title{font-weight:700;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .play-count{font-size:11px;background:rgba(0,212,255,0.1);padding:3px 8px;border-radius:10px;color:var(--accent);font-weight:bold;border:1px solid rgba(0,212,255,0.2);white-space:nowrap}
+    
+    .card-desc{font-size:13px;color:var(--muted);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.8em}
     
     .card-footer{margin-top:auto;padding-top:10px;border-top:1px solid var(--glass-border);display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
     
     .status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px}
     .status-dot.done{background:#22c55e;box-shadow:0 0 8px #22c55e}
 
-    /* リストビュー用の調整 */
-    .grid.list-view .game-card{flex-direction:row;height:100px}
-    .grid.list-view .thumb{width:150px;height:100px}
+    /* リストビュー調整 */
+    .grid.list-view .game-card{flex-direction:row;height:90px}
+    .grid.list-view .thumb{width:140px;height:90px}
     .grid.list-view .card-desc{display:none}
+    .grid.list-view .rank-tag{height:30px;width:24px;font-size:14px}
 
     .count-bar{font-size:13px;color:var(--muted)}
     .count-bar span{color:var(--accent);font-weight:bold}
-
-    @media(max-width:600px){
-      .hero{flex-direction:column;text-align:center}
-      .filter-row{flex-direction:column;align-items:stretch}
-    }
   </style>
 </head>
 <body>
@@ -129,8 +133,8 @@
       <div class="brand">
         <div class="logo-icon">🎮</div>
         <div>
-          <div class="title">MIN-Tube-Pro Games</div>
-          <div class="tagline"><div class="spark"></div>リアルタイム・ランキング配信中</div>
+          <div class="title">MIN-Tube-Pro Ranking</div>
+          <div class="tagline"><div class="spark"></div>リアルタイム・人気ランキング</div>
         </div>
       </div>
     </header>
@@ -151,9 +155,9 @@
         </nav>
         <div class="sort-wrap">
           <select id="sortSelect">
-            <option value="popular">🔥 人気順</option>
-            <option value="name-asc">名前 (A-Z)</option>
-            <option value="name-desc">名前 (Z-A)</option>
+            <option value="popular">🔥 人気ランキング順</option>
+            <option value="name-asc">名前順 (A-Z)</option>
+            <option value="name-desc">名前順 (Z-A)</option>
           </select>
           <div class="view-toggle">
             <button class="view-btn active" id="btnGrid">田</button>
@@ -175,12 +179,12 @@
 
     const $ = id => document.getElementById(id);
     let allGames = [];
-    let gameStats = {}; // { key: play_count }
+    let gameStats = {}; 
     let activeGenre = 'all';
-    let activeSort = 'popular';
+    let activeSort = 'popular'; // 初期状態は人気順
     let activeSearch = '';
 
-    // ── 2. ユーザー識別（1分制限用） ──
+    // ── 2. UUID取得（1分制限用） ──
     const getClientId = () => {
       let id = localStorage.getItem('min_tube_uid');
       if(!id) { id = crypto.randomUUID(); localStorage.setItem('min_tube_uid', id); }
@@ -191,42 +195,40 @@
     // ── 3. データ取得 ──
     async function loadData() {
       try {
-        // A. ゲームマスター取得
         const res = await fetch('games.json');
         allGames = await res.json();
 
-        // B. ランキング数値取得
+        // 初回ランキング数値取得
         const { data: stats } = await supabaseClient.from('game_rankings').select('game_key, play_count');
-        stats?.forEach(s => gameStats[s.game_key] = s.play_count);
+        stats?.forEach(s => gameStats[s.game_key] = parseInt(s.play_count));
 
         render();
         setupRealtime();
       } catch (e) {
-        console.error("データロード失敗:", e);
+        console.error("Load failed:", e);
+        $('countBar').innerText = "データのロードに失敗しました。";
       }
     }
 
-    // ── 4. リアルタイム更新 ──
+    // ── 4. リアルタイム更新（他人のプレイを即反映） ──
     function setupRealtime() {
       supabaseClient
-        .channel('rank_updates')
+        .channel('schema-db-changes')
         .on('postgres_changes', { event: '*', table: 'game_rankings' }, payload => {
           const { game_key, play_count } = payload.new;
-          gameStats[game_key] = play_count;
+          gameStats[game_key] = parseInt(play_count);
           
-          // 数値バッジだけ最速更新
+          // 表示バッジのみ更新（DOM再構築は重いためデバウンス）
           const badge = $(`count-${game_key}`);
           if(badge) badge.innerText = `${play_count} plays`;
           
-          // 人気順なら並び替えをトリガー
           if(activeSort === 'popular') debounceRender();
         })
         .subscribe();
     }
 
-    // ── 5. プレイ処理 ──
-    async function play(key, file) {
-      // サーバーサイド関数呼び出し（1分判定はDB内で行う）
+    // ── 5. プレイ処理（RPCで1分制限をサーバーサイドチェック） ──
+    async function play(key) {
       await supabaseClient.rpc('increment_game_play', { 
         target_game_key: key, 
         user_uuid: uid 
@@ -234,31 +236,48 @@
       window.location.href = `play.html?game=${key}`;
     }
 
-    // ── 6. 描画ロジック ──
+    // ── 6. メイン描画（ソート & ランキング演出） ──
     function render() {
       const grid = $('gameGrid');
       const query = activeSearch.toLowerCase();
 
-      // フィルタリング
       let filtered = allGames.filter(g => {
         const matchGenre = activeGenre === 'all' || g.genre === activeGenre;
-        const matchSearch = g.name.toLowerCase().includes(query) || (g.tags && g.tags.some(t => t.toLowerCase().includes(query)));
+        const matchSearch = g.name.toLowerCase().includes(query) || 
+                           (g.tags && g.tags.some(t => t.toLowerCase().includes(query)));
         return matchGenre && matchSearch;
       });
 
-      // ソート
+      // 【重要】ソートロジック：人気順 -> 同率は A-Z順
       filtered.sort((a, b) => {
-        if(activeSort === 'popular') return (gameStats[b.key] || 0) - (gameStats[a.key] || 0);
-        if(activeSort === 'name-asc') return a.name.localeCompare(b.name, 'ja');
-        return b.name.localeCompare(a.name, 'ja');
+        if(activeSort === 'popular') {
+          const countA = gameStats[a.key] || 0;
+          const countB = gameStats[b.key] || 0;
+          if (countB !== countA) return countB - countA;
+          // 同率ならA-Z順
+          return a.name.localeCompare(b.name, 'ja', {numeric: true});
+        }
+        if(activeSort === 'name-asc') return a.name.localeCompare(b.name, 'ja', {numeric: true});
+        return b.name.localeCompare(a.name, 'ja', {numeric: true});
       });
 
       grid.innerHTML = '';
-      filtered.forEach(g => {
+      filtered.forEach((g, index) => {
         const count = gameStats[g.key] || 0;
         const card = document.createElement('article');
-        card.className = 'game-card';
+        
+        // 1-3位の演出用クラス（フィルタリング中も上位は目立たせる）
+        let rankClass = '';
+        let medal = '';
+        if (activeSort === 'popular') {
+          if (index === 0) { rankClass = 'rank-1'; medal = '1'; }
+          else if (index === 1) { rankClass = 'rank-2'; medal = '2'; }
+          else if (index === 2) { rankClass = 'rank-3'; medal = '3'; }
+        }
+
+        card.className = `game-card ${rankClass}`;
         card.innerHTML = `
+          <div class="rank-tag">${medal}</div>
           <div class="thumb">
             ${g.image ? `<img src="${g.image}" loading="lazy">` : `<div class="big-icon">${g.emoji}</div>`}
             <div class="play-overlay"><div class="play-btn">▶</div></div>
@@ -275,16 +294,16 @@
             </div>
           </div>
         `;
-        card.onclick = () => play(g.key, g.file);
+        card.onclick = () => play(g.key);
         grid.appendChild(card);
       });
 
-      $('countBar').innerHTML = `<span>${filtered.length}</span> 件のゲームが見つかりました`;
+      $('countBar').innerHTML = `<span>${filtered.length}</span> 件のゲーム`;
     }
 
-    // ── 7. イベント管理 ──
+    // ── 7. イベント制御 ──
     let timer;
-    const debounceRender = () => { clearTimeout(timer); timer = setTimeout(render, 500); };
+    const debounceRender = () => { clearTimeout(timer); timer = setTimeout(render, 1000); };
 
     $('searchInput').oninput = (e) => { activeSearch = e.target.value; render(); };
     $('sortSelect').onchange = (e) => { activeSort = e.target.value; render(); };
@@ -301,7 +320,6 @@
     $('btnGrid').onclick = () => { $('gameGrid').classList.remove('list-view'); $('btnGrid').classList.add('active'); $('btnList').classList.remove('active'); };
     $('btnList').onclick = () => { $('gameGrid').classList.add('list-view'); $('btnList').classList.add('active'); $('btnGrid').classList.remove('active'); };
 
-    // 初期起動
     loadData();
   </script>
 </body>
