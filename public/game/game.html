@@ -44,7 +44,7 @@
     .spark{width:8px;height:8px;border-radius:50%;background:#00d4ff;box-shadow:0 0 10px #00d4ff;animation:pulse 2s infinite}
     @keyframes pulse{0%,100%{transform:scale(0.8);opacity:0.5}50%{transform:scale(1.2);opacity:1}}
 
-    /* 同時接続バッジ */
+    /* 全体の同時接続数 */
     .live-count-wrap {
       display: flex; align-items: center; gap: 8px;
       background: rgba(74, 222, 128, 0.1); color: var(--live);
@@ -57,12 +57,13 @@
     }
     @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
-    /* プレイ中人数ラベル */
+    /* プレイ中人数ラベル (カード内) */
     .playing-now {
       display: none; align-items: center; gap: 4px;
       font-size: 11px; color: var(--live); font-weight: 700;
-      background: rgba(74, 222, 128, 0.1); padding: 2px 8px; border-radius: 4px;
+      background: rgba(74, 222, 128, 0.1); padding: 4px 10px; border-radius: 6px;
       margin-top: 4px; width: fit-content;
+      border: 1px solid rgba(74, 222, 128, 0.15);
     }
 
     /* ツールバー */
@@ -204,7 +205,7 @@
     const $ = id => document.getElementById(id);
     let allGames = [];
     let gameStats = {}; 
-    let playingCounts = {}; // 各ゲームの現在プレイ人数
+    let playingCounts = {}; 
     let activeGenre = 'all';
     let activeSort = 'popular';
     let activeSearch = '';
@@ -240,11 +241,11 @@
           gameStats[game_key] = parseInt(play_count);
           const badge = $(`count-${game_key}`);
           if(badge) badge.innerText = `${play_count} plays`;
-          if(activeSort === 'popular') debounceRender();
         })
         .subscribe();
     }
 
+    // プレイ中人数を管理するプレゼンス設定
     function setupPresence() {
       const channel = supabaseClient.channel('global-presence', {
         config: { presence: { key: uid } }
@@ -254,13 +255,14 @@
         .on('presence', { event: 'sync' }, () => {
           const state = channel.presenceState();
           
-          // 全体人数
+          // サイト全体の人数
           $('onlineCount').innerText = Object.keys(state).length;
 
           // ゲームごとのプレイ人数を集計
           playingCounts = {};
           Object.values(state).forEach(presences => {
             presences.forEach(p => {
+              // play.html側で p.playing = 'gameKey' を送信している前提
               if (p.playing) {
                 playingCounts[p.playing] = (playingCounts[p.playing] || 0) + 1;
               }
@@ -270,11 +272,13 @@
         })
         .subscribe(async (status) => {
           if (status === 'SUBSCRIBED') {
+            // 一覧画面にいるときは playing: null
             await channel.track({ online_at: new Date().toISOString(), playing: null });
           }
         });
     }
 
+    // カード上の「〇人がプレイ中」バッジを更新する関数
     function updatePlayingBadges() {
       allGames.forEach(g => {
         const el = $(`playing-${g.key}`);
@@ -290,6 +294,7 @@
     }
 
     async function play(key) {
+      // プレイ回数を増やす
       await supabaseClient.rpc('increment_game_play', { 
         target_game_key: key, 
         user_uuid: uid 
@@ -307,6 +312,7 @@
         return matchGenre && matchSearch;
       });
 
+      // 並び替え
       filtered.sort((a, b) => {
         if(activeSort === 'popular') {
           const countA = gameStats[a.key] || 0;
@@ -341,9 +347,9 @@
           <div class="card-body">
             <div class="card-title-row">
               <span class="card-title">${g.name}</span>
-              <span class="play-count" id="count-${g.key}">${count} played</span>
+              <span class="play-count" id="count-${g.key}">${count} plays</span>
             </div>
-            <!-- プレイ中人数表示 -->
+            <!-- プレイ中人数表示 (ここを更新) -->
             <div class="playing-now" id="playing-${g.key}"></div>
             
             <div class="card-desc">${g.desc}</div>
@@ -360,9 +366,6 @@
       updatePlayingBadges();
       $('countBar').innerHTML = `<span>${filtered.length}</span> 件のゲーム`;
     }
-
-    let timer;
-    const debounceRender = () => { clearTimeout(timer); timer = setTimeout(render, 1000); };
 
     $('searchInput').oninput = (e) => { activeSearch = e.target.value; render(); };
     $('sortSelect').onchange = (e) => { activeSort = e.target.value; render(); };
