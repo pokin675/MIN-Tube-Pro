@@ -18,10 +18,13 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       height: 100vh; overflow: hidden; color: var(--text);
-      font-family: Inter, "Noto Sans JP", sans-serif; background: var(--bg);
+      font-family: Inter, "Noto Sans JP", sans-serif; background: #000;
     }
+    
+    /* レイアウト構造 */
     .layout { display: flex; flex-direction: column; height: 100%; position: relative; }
     
+    /* トップバー（自動非表示対応） */
     .topbar {
       position: absolute; top: 0; left: 0; right: 0;
       display: flex; align-items: center; gap: 12px; padding: 10px 18px;
@@ -30,13 +33,16 @@
       transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
     .hide-ui .topbar { transform: translateY(-100%); }
+    .hide-ui .side-toggle { transform: translateY(-50%) translateX(100%); opacity: 0; }
 
     .back-btn, .action-btn, .panel-close {
       display: inline-flex; align-items: center; gap: 6px; color: var(--muted);
       text-decoration: none; padding: 6px 12px; border-radius: 8px;
       border: 1px solid var(--border); background: var(--glass); cursor: pointer; transition: .18s;
+      font-size: 14px;
     }
-    .back-btn:hover, .action-btn:hover { color: var(--accent); background: rgba(0,212,255,0.07); }
+    .back-btn:hover, .action-btn:hover { color: var(--accent); background: rgba(0,212,255,0.07); border-color: var(--accent); }
+    
     .divider { width: 1px; height: 24px; background: var(--border); }
     .game-info { flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; }
     .game-name { font-weight: 700; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -50,26 +56,20 @@
     .live-dot::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: var(--live); animation: ping 2s infinite; }
     @keyframes ping { 0% { transform: scale(1); opacity: 0.6 } 70%,100% { transform: scale(2.4); opacity: 0 } }
 
-    /* 全画面用ラッパー */
-    .frame-wrap { flex: 1; position: relative; background: #000; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
-    iframe { width: 100%; height: 100%; border: none; }
+    /* フレームコンテナ */
+    .frame-wrap { flex: 1; position: relative; background: #000; width: 100%; height: 100%; }
+    iframe { width: 100%; height: 100%; border: none; display: block; }
 
-    /* 全画面時のスタイル強制上書き */
-    .layout.is-fullscreen .frame-wrap { position: fixed; inset: 0; z-index: 9999; }
-    .layout.is-fullscreen .topbar { display: none !important; }
-
-    .loading, .error-screen {
+    /* ロード・エラー */
+    .overlay {
       position: absolute; inset: 0; z-index: 10; display: flex; flex-direction: column;
-      align-items: center; justify-content: center; gap: 20px; background: var(--bg); transition: .4s;
+      align-items: center; justify-content: center; gap: 20px; background: #071029; transition: .4s;
     }
     .hidden { opacity: 0; pointer-events: none; }
     .spinner { width: 40px; height: 40px; border: 3px solid rgba(0,212,255,.1); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg) } }
     
-    .error-screen { display: none; text-align: center; padding: 20px; }
-    .error-screen.show { display: flex; }
-    .retry-btn { padding: 10px 22px; border-radius: 10px; border: none; font-weight: 600; background: linear-gradient(135deg, var(--accent), #6a00ff); color: #fff; cursor: pointer; }
-
+    /* サイドパネル */
     .side-toggle {
       position: fixed; right: 0; top: 50%; transform: translateY(-50%); width: 28px; height: 64px;
       background: rgba(7,16,41,0.8); border: 1px solid var(--border); border-right: none;
@@ -77,25 +77,33 @@
       cursor: pointer; z-index: 200; backdrop-filter: blur(8px); transition: 0.4s;
     }
     .side-panel {
-      position: fixed; right: -300px; top: 0; bottom: 0; width: 300px;
+      position: fixed; right: -320px; top: 0; bottom: 0; width: 320px;
       background: rgba(7, 16, 41, 0.95); border-left: 1px solid var(--border);
-      backdrop-filter: blur(16px); z-index: 199; transition: .3s cubic-bezier(.4,0,.2,1);
-      display: flex; flex-direction: column;
+      backdrop-filter: blur(20px); z-index: 210; transition: .3s cubic-bezier(.4,0,.2,1);
+      display: flex; flex-direction: column; box-shadow: -10px 0 30px rgba(0,0,0,0.5);
     }
     .side-panel.open { right: 0; }
-    .panel-header { padding: 18px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; }
-    .panel-body { padding: 20px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
-    .info-label { font-size: 11px; color: var(--muted); text-transform: uppercase; margin-bottom: 4px; }
-    .tag { font-size: 12px; padding: 2px 8px; border-radius: 10px; background: rgba(0,212,255,0.1); color: var(--accent); margin: 2px; display: inline-block; }
+    .panel-header { padding: 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .panel-body { padding: 20px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
+    .info-label { font-size: 11px; color: var(--muted); text-transform: uppercase; margin-bottom: 6px; font-weight: bold; }
+    .tag { font-size: 12px; padding: 4px 10px; border-radius: 6px; background: rgba(0,212,255,0.1); color: var(--accent); margin: 2px; display: inline-block; }
     
-    svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-    @media(max-width:600px) { .game-sub, .live-badge span, .side-toggle, .side-panel { display: none; } }
+    svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    
+    /* 全画面時のUI調整 */
+    :fullscreen .topbar { background: rgba(7, 16, 41, 0.7); }
+
+    @media(max-width:600px) { .game-sub, .live-badge span, .side-toggle { display: none; } }
   </style>
 </head>
 <body>
+
   <div class="layout" id="layout">
+    <!-- トップバー -->
     <header class="topbar" id="topbar">
-      <a href="game.html" class="back-btn"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>一覧</a>
+      <a href="game.html" class="back-btn">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>一覧
+      </a>
       <div class="divider"></div>
       <div class="game-info">
         <span id="gameEmoji" style="font-size:20px">🎮</span>
@@ -105,33 +113,52 @@
         </div>
       </div>
 
-      <div class="live-badge" id="liveBadge">
+      <div class="live-badge">
         <div class="live-dot"></div>
-        <span id="onlineCount">1</span> users
+        <span id="onlineCount">1</span><span style="margin-left:4px">Users</span>
       </div>
 
-      <button class="action-btn" id="reloadBtn"><svg viewBox="0 0 24 24"><path d="M23 4v6h-6M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>リロード</button>
-      <button class="action-btn" id="fsBtn"><svg viewBox="0 0 24 24" id="fsIcon"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>全画面</button>
+      <button class="action-btn" id="reloadBtn" title="リロード">
+        <svg viewBox="0 0 24 24"><path d="M23 4v6h-6M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      </button>
+      <button class="action-btn" id="fsBtn" title="全画面">
+        <svg id="fsIcon" viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+      </button>
     </header>
 
+    <!-- メインコンテンツ -->
     <main class="frame-wrap" id="fullscreenTarget">
-      <div class="loading" id="loadingScreen">
+      <!-- ロード画面 -->
+      <div class="overlay" id="loadingOverlay">
         <div class="spinner"></div>
-        <div id="loadingGameName" style="font-size:14px;color:var(--muted)"></div>
+        <div id="loadingMsg" style="font-size:14px;color:var(--muted)">準備中...</div>
       </div>
-      <div class="error-screen" id="errorScreen">
+      
+      <!-- エラー画面 -->
+      <div class="overlay hidden" id="errorOverlay">
         <div style="font-size:48px">⚠️</div>
-        <div id="errorMsg" style="margin-bottom:10px">ゲームが見つかりません。</div>
-        <button class="retry-btn" id="retryBtn">再試行</button>
+        <div id="errorMsg" style="margin-top:10px">ゲームが見つかりません</div>
+        <button class="back-btn" style="margin-top:20px" onclick="location.reload()">再試行</button>
       </div>
+
       <iframe id="gameFrame" allow="autoplay; fullscreen; keyboard-lock; pointer-lock" allowfullscreen></iframe>
     </main>
+
+    <!-- サイドトグル（UI自動表示対象） -->
+    <div class="side-toggle" id="sideToggle">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+    </div>
   </div>
 
-  <div class="side-toggle" id="sideToggle"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg></div>
+  <!-- サイドパネル -->
   <aside class="side-panel" id="sidePanel">
-    <div class="panel-header"><b>ゲーム情報</b><div class="panel-close" id="panelClose">✕</div></div>
-    <div class="panel-body" id="panelBody"></div>
+    <div class="panel-header">
+      <b style="font-size: 16px;">ゲーム情報</b>
+      <button class="panel-close" id="panelClose">✕</button>
+    </div>
+    <div class="panel-body" id="panelBody">
+      <!-- JSで挿入 -->
+    </div>
   </aside>
 
   <script>
@@ -142,42 +169,26 @@
     const $ = id => document.getElementById(id);
     const params = new URLSearchParams(location.search);
     const gameKey = params.get('game') || '';
-    let currentGame = null;
-    let uiTimer;
-
-    const getClientId = () => {
+    const uid = (() => {
       let id = localStorage.getItem('min_tube_uid');
       if(!id) { id = crypto.randomUUID(); localStorage.setItem('min_tube_uid', id); }
       return id;
-    };
-    const uid = getClientId();
+    })();
 
+    let uiTimer;
     const UI = {
-      frame: $('gameFrame'), loading: $('loadingScreen'), error: $('errorScreen'),
-      badge: $('liveBadge'), panel: $('sidePanel'), layout: $('layout'), topbar: $('topbar')
+      layout: $('layout'),
+      topbar: $('topbar'),
+      frame: $('gameFrame'),
+      panel: $('sidePanel')
     };
 
-    function setupPresence() {
-      const channel = supabaseClient.channel('global-presence', {
-        config: { presence: { key: uid } }
-      });
-
-      channel
-        .on('presence', { event: 'sync' }, () => {
-          const state = channel.presenceState();
-          $('onlineCount').innerText = Object.keys(state).length;
-        })
-        .subscribe(async (status) => {
-          if (status === 'SUBSCRIBED') {
-            await channel.track({ online_at: new Date().toISOString(), playing: gameKey });
-          }
-        });
-    }
-
+    // 1. UI自動非表示ロジック (既存機能)
     const showUI = () => {
       UI.layout.classList.remove('hide-ui');
       clearTimeout(uiTimer);
       uiTimer = setTimeout(() => {
+        // パネルが開いておらず、かつマウスが上部バーにない場合に隠す
         if (!UI.panel.classList.contains('open') && !UI.topbar.matches(':hover')) {
           UI.layout.classList.add('hide-ui');
         }
@@ -187,38 +198,67 @@
     window.addEventListener('mousemove', showUI);
     window.addEventListener('touchstart', showUI);
 
-    async function loadGame() {
+    // 2. プレゼンス設定 (プレイ中ゲームを他ユーザーへ通知)
+    function setupPresence() {
+      const channel = supabaseClient.channel('global-presence', {
+        config: { presence: { key: uid } }
+      });
+
+      channel
+        .on('presence', { event: 'sync' }, () => {
+          const state = channel.presenceState();
+          // サイト全体の人数を表示
+          $('onlineCount').innerText = Object.keys(state).length;
+        })
+        .subscribe(async (status) => {
+          if (status === 'SUBSCRIBED') {
+            // playing: gameKey を送ることで games.html 側でカウント可能にする
+            await channel.track({ online_at: new Date().toISOString(), playing: gameKey });
+          }
+        });
+    }
+
+    // 3. ゲーム読み込み
+    async function init() {
       try {
         const res = await fetch('games.json');
         const games = await res.json();
-        currentGame = games.find(g => g.key === gameKey);
-        if (!currentGame) throw new Error('ゲームが見つかりません');
+        const game = games.find(g => g.key === gameKey);
 
-        document.title = `${currentGame.name} — MIN-Tube-Pro`;
-        $('gameName').textContent = currentGame.name;
-        $('gameEmoji').textContent = currentGame.emoji;
-        $('loadingGameName').textContent = currentGame.name;
+        if (!game) throw new Error('Game not found');
+
+        document.title = `${game.name} — MIN-Tube-Pro`;
+        $('gameName').textContent = game.name;
+        $('gameEmoji').textContent = game.emoji;
+        $('loadingMsg').textContent = `${game.name} を読み込み中...`;
+
+        // サイドパネル情報
         $('panelBody').innerHTML = `
-          <div><div class="info-label">説明</div><div>${currentGame.desc}</div></div>
-          <div><div class="info-label">タグ</div><div>${currentGame.tags.map(t => `<span class="tag">${t}</span>`).join('')}</div></div>
+          <div><div class="info-label">説明</div><div style="font-size:14px;line-height:1.6;color:var(--muted)">${game.desc}</div></div>
+          <div><div class="info-label">ジャンル</div><span class="tag">${game.genreLabel}</span></div>
+          <div><div class="info-label">タグ</div><div>${game.tags.map(t => `<span class="tag">${t}</span>`).join('')}</div></div>
         `;
 
-        UI.frame.onload = () => { UI.loading.classList.add('hidden'); };
-        UI.frame.src = currentGame.file;
+        UI.frame.onload = () => { $('loadingOverlay').classList.add('hidden'); };
+        UI.frame.src = game.file;
+
         setupPresence();
       } catch (err) {
-        UI.loading.classList.add('hidden');
-        UI.error.classList.add('show');
-        $('errorMsg').textContent = err.message;
+        $('loadingOverlay').classList.add('hidden');
+        $('errorOverlay').classList.remove('hidden');
+        console.error(err);
       }
     }
 
-    // 全画面表示の修正版ロジック
-    $('fsBtn').onclick = () => {
-      const target = $('layout');
+    // 4. 全画面修正版ロジック
+    // fullscreenTargetを全画面にすることでUIもその中で管理可能にする
+    const fsBtn = $('fsBtn');
+    const fsTarget = $('fullscreenTarget');
+
+    fsBtn.onclick = () => {
       if (!document.fullscreenElement) {
-        if (target.requestFullscreen) target.requestFullscreen();
-        else if (target.webkitRequestFullscreen) target.webkitRequestFullscreen();
+        if (UI.layout.requestFullscreen) UI.layout.requestFullscreen();
+        else if (UI.layout.webkitRequestFullscreen) UI.layout.webkitRequestFullscreen();
       } else {
         if (document.exitFullscreen) document.exitFullscreen();
         else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
@@ -227,15 +267,20 @@
 
     document.onfullscreenchange = () => {
       const isFS = !!document.fullscreenElement;
-      UI.layout.classList.toggle('is-fullscreen', isFS);
+      const icon = $('fsIcon');
+      if (isFS) {
+        icon.innerHTML = '<path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/>';
+      } else {
+        icon.innerHTML = '<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>';
+      }
     };
 
-    $('reloadBtn').onclick = () => { UI.frame.src = UI.frame.src; };
-    $('retryBtn').onclick = () => location.reload();
-    $('sideToggle').onclick = () => UI.panel.classList.toggle('open');
-    $('panelClose').onclick = () => UI.panel.classList.remove('open');
+    // 5. その他のイベント
+    $('reloadBtn').onclick = () => { UI.frame.src = UI.frame.src; $('loadingOverlay').classList.remove('hidden'); };
+    $('sideToggle').onclick = () => { UI.panel.classList.add('open'); showUI(); };
+    $('panelClose').onclick = () => { UI.panel.classList.remove('open'); };
 
-    loadGame();
+    init();
     showUI();
   </script>
 </body>
