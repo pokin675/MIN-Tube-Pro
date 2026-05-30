@@ -7,9 +7,9 @@
 <meta http-equiv="Content-Security-Policy"
   content="default-src 'self'; script-src 'self' 'unsafe-inline' https://esm.sh; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://esm.sh; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self';" />
 <title>min-chat</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=Inter:wght@400;600;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="preconnect" href__="https://fonts.googleapis.com">
+<link rel="preconnect" href__="https://fonts.gstatic.com" crossorigin>
+<link href__="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=Inter:wght@400;600;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#0a0a0a;--bg2:#0f0f0f;--bg3:#141414;
@@ -253,8 +253,9 @@ const HEX_RE  = /^#[0-9a-fA-F]{6}$/;
 
 const nameToEmail = n => "u_" + btoa(unescape(encodeURIComponent(n))).replace(/[^a-zA-Z0-9]/g,"").toLowerCase().slice(0,40) + "@chat.local";
 
-let me=null, myIgnores=new Set(), chCh=null, prCh=null;
+let me=null, myIgnores=new Set(), chCh=null, prCh=null, presCh=null;
 let lastSenderId=null, lastSenderTime=0;
+let reconnectTimer=null; // 【追加】再接続タイマー管理
 const COMMANDS = [
   {c:"help",a:"",d:"コマンド一覧"},
   {c:"omi",a:"",d:"おみくじ(1日1回)"},
@@ -336,7 +337,7 @@ async function boot(){
   renderMe();
   await loadIgnores();
   await loadMessages();
-  await loadUsers();
+  // ※ loadUsers() はPresenceのsyncで自動実行されるため不要
   subscribe();
   $("#chat").addEventListener("scroll", scheduleReadSync, { passive:true });
   window.addEventListener("focus", scheduleReadSync);
@@ -386,21 +387,30 @@ async function loadMessages(){
   scrollBot(true);
 }
 
-async function loadUsers(){
-  const { data } = await sb.from("profiles").select("user_id,name,tag,role,name_color,nick_hidden").order("name");
-  const ul = $("#userlist"); ul.innerHTML="";
-  const list = (data||[]);
+// 【変更】Presenceベースのオンラインユーザー描画
+function renderOnlineUsers(state){
+  const ul = $("#userlist");
+  ul.innerHTML = "";
+  const list = [];
+
+  for(const presences of Object.values(state)){
+    if(presences.length > 0) list.push(presences[0]);
+  }
+
   const rank = r => r==="founder"?4:r==="admin"?3:r==="deleter"?2:1;
   list.sort((a,b)=>rank(b.role)-rank(a.role) || a.name.localeCompare(b.name,"ja"));
+
   list.forEach(u=>{
     const hideTag = u.nick_hidden || u.role==="founder";
     const tag = hideTag ? "" : `<span class="tag">#${String(u.tag).padStart(5,"0")}</span>`;
     const badge = u.nick_hidden ? "" : roleBadge(u.role);
     const d = document.createElement("div");
     d.className = "u";
-    d.innerHTML = `<div class="av">${esc((u.name||"?").slice(0,1))}</div><div class="nm">${nameHtml(u.name,u.name_color)} ${tag} ${badge}</div>`;
+    d.innerHTML = `<div class="av">${esc((u.name||"?").slice(0,1))}</div>
+      <div class="nm">${nameHtml(u.name,u.name_color)} ${tag} ${badge}</div>`;
     ul.appendChild(d);
   });
+
   $("#cnt").textContent = String(list.length).padStart(2,"0");
 }
 
@@ -453,36 +463,69 @@ function setRt(ok, label){
   $("#rttext").textContent = label || (ok?"LIVE":"OFFLINE");
 }
 
+// 【変更】subscribe：再接続ロジック＋Presence統合
 function subscribe(){
-  if(chCh) sb.removeChannel(chCh);
+  // 既存チャンネルをすべてクリーンアップ
+  if(chCh){ sb.removeChannel(chCh); chCh=null; }
+  if(prCh){ sb.removeChannel(prCh); prCh=null; }
+  if(presCh){ sb.removeChannel(presCh); presCh=null; }
+  if(reconnectTimer){ clearTimeout(reconnectTimer); reconnectTimer=null; }
+
+  // メッセージ購読
   chCh = sb.channel("messages-rt")
     .on("postgres_changes",{event:"INSERT",schema:"public",table:"messages"}, p=>{ addMsg(p.new); scrollBot(); })
     .on("postgres_changes",{event:"DELETE",schema:"public",table:"messages"}, p=>{
       const el=document.querySelector(`.msg[data-id="${p.old.id}"]`); if(el) el.remove();
     })
-    .subscribe(s=>{ setRt(s==="SUBSCRIBED", s==="SUBSCRIBED"?"LIVE":"接続中…"); });
-  if(prCh) sb.removeChannel(prCh);
+    .subscribe((status)=>{
+      if(status==="SUBSCRIBED"){
+        setRt(true,"LIVE");
+      } else if(status==="CHANNEL_ERROR" || status==="TIMED_OUT" || status==="CLOSED"){
+        setRt(false,"再接続中…");
+        // 5秒後に全チャンネル再接続
+        if(!reconnectTimer){
+          reconnectTimer = setTimeout(()=>{ reconnectTimer=null; subscribe(); }, 5000);
+        }
+      }
+    });
+
+  // プロフィール変更購読
   prCh = sb.channel("profiles-rt")
     .on("postgres_changes",{event:"*",schema:"public",table:"profiles"}, async ()=>{
-      await loadUsers();
       const { data } = await sb.rpc("login_check");
       if(data?.ok){ me = data.profile; renderMe(); }
     }).subscribe();
+
+  // 【追加】Presenceでオンラインユーザー管理
+  presCh = sb.channel("presence-rt", {
+    config: { presence: { key: me.user_id } }
+  });
+  presCh.on("presence", { event:"sync" }, ()=>{
+    renderOnlineUsers(presCh.presenceState());
+  });
+  presCh.subscribe(async (status)=>{
+    if(status==="SUBSCRIBED"){
+      await presCh.track({
+        user_id:   me.user_id,
+        name:      me.name,
+        tag:       me.tag,
+        role:      me.role,
+        name_color:me.name_color,
+        nick_hidden:me.nick_hidden
+      });
+    }
+  });
+
   setupTyping();
   setupReads();
 }
 
-// ===== TYPING INDICATOR (optimized) =====
-// - throttle broadcasts (>=2s gap)
-// - auto-stop after 2s idle
-// - stop on blur / page hidden / send
-// - only fire when text actually changed
+// ===== TYPING INDICATOR =====
 let tyCh=null, lastTypingSent=0, lastTypingText="", typingIdleTimer=null, typingActive=false;
-const typers = new Map(); // user_id -> {name,color,exp}
+const typers = new Map();
 function renderTypers(){
   const now=Date.now();
-  let changed=false;
-  for(const [k,v] of typers) if(v.exp<now){ typers.delete(k); changed=true; }
+  for(const [k,v] of typers) if(v.exp<now){ typers.delete(k); }
   const list=[...typers.values()];
   const el=$("#typers");
   if(!list.length){ el.classList.remove("on"); el.innerHTML=""; return; }
@@ -528,9 +571,9 @@ function stopTyping(){
   tyCh.send({ type:"broadcast", event:"st", payload:{ id:me.user_id }});
 }
 
-// ===== READ RECEIPTS (既読) — broadcast based, no DB =====
+// ===== READ RECEIPTS =====
 let rdCh=null, myLastRead=0, lastReadSent=0, readSyncTimer=null;
-const reads = new Map(); // user_id -> last_read_msg_id
+const reads = new Map();
 function setupReads(){
   if(rdCh) sb.removeChannel(rdCh);
   rdCh = sb.channel("reads-rt", { config:{ broadcast:{ self:false }}});
@@ -540,7 +583,7 @@ function setupReads(){
     const prev = reads.get(payload.id)||0;
     if(payload.n > prev){ reads.set(payload.id, payload.n); updateReadBadges(); }
   });
-  rdCh.on("broadcast",{event:"hi"}, ()=>{ // newcomer: rebroadcast current
+  rdCh.on("broadcast",{event:"hi"}, ()=>{
     if(myLastRead) sendRead(true);
   });
   rdCh.subscribe(s=>{
@@ -573,9 +616,7 @@ function sendRead(force){
 }
 function updateReadBadges(){
   if(!me) return;
-  // remove existing badges
   document.querySelectorAll("#chat .reads").forEach(el=>el.remove());
-  // find last own non-private msg
   const own = [...document.querySelectorAll(`#chat .msg[data-uid="${me.user_id}"]`)]
     .filter(el=>el.dataset.kind!=="private");
   if(!own.length) return;
@@ -661,7 +702,19 @@ async function submit(){
     else if(data.result) flash("🎴 "+data.result, "ok");
     if(cmd==="ignore"||cmd==="unignore") await loadIgnores();
     if(cmd==="color"||cmd==="nick"){
-      const { data:d2 } = await sb.rpc("login_check"); if(d2?.ok){ me=d2.profile; renderMe(); }
+      const { data:d2 } = await sb.rpc("login_check");
+      if(d2?.ok){
+        me=d2.profile; renderMe();
+        // Presenceのトラッキング情報も更新
+        if(presCh) await presCh.track({
+          user_id:    me.user_id,
+          name:       me.name,
+          tag:        me.tag,
+          role:       me.role,
+          name_color: me.name_color,
+          nick_hidden:me.nick_hidden
+        });
+      }
     }
   } else {
     const { data, error } = await sb.rpc("send_message", { p_content: v });
@@ -675,7 +728,15 @@ async function submit(){
 
 $("#togUsers").onclick = ()=>{ const p=$("#userpane"); p.style.display = p.style.display==="none"?"":"none"; };
 
-sb.auth.onAuthStateChange((e)=>{ if(e==="SIGNED_OUT"){ location.reload(); }});
+// 【変更】サインアウト時のみリロード、TOKEN_REFRESHED時は再接続
+sb.auth.onAuthStateChange((event)=>{
+  if(event==="SIGNED_OUT"){
+    location.reload();
+  } else if(event==="TOKEN_REFRESHED"){
+    // トークン更新後、チャンネルを再接続（リロード不要）
+    if(me) subscribe();
+  }
+});
 
 boot();
 </script>
