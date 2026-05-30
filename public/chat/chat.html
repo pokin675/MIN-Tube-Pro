@@ -1,1164 +1,683 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>オープンチャット + Othello（完全版）</title>
-  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<meta name="referrer" content="no-referrer" />
+<meta http-equiv="Content-Security-Policy"
+  content="default-src 'self'; script-src 'self' 'unsafe-inline' https://esm.sh; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://esm.sh; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self';" />
+<title>min-chat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=Inter:wght@400;600;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0a0a;--bg2:#0f0f0f;--bg3:#141414;
+    --line:#242424;--line2:#1a1a1a;
+    --fg:#f5f5f5;--muted:#8a8a8a;--subtle:#5e5e5e;
+    --gold:#d4af37;--gold2:#a88a2a;--red:#e53935;--ok:#22c55e;--warn:#f59e0b;
+    --input:#101010;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:"Noto Sans JP",Inter,"Helvetica Neue",Arial,sans-serif;font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;overscroll-behavior:none}
+  body{background:
+    radial-gradient(1200px 600px at 90% -10%, rgba(212,175,55,.07), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, rgba(255,255,255,.04), transparent 60%),
+    var(--bg)}
+  button{font-family:inherit}
+  code{font-family:"JetBrains Mono",Consolas,monospace;font-size:12px;background:#000;padding:1px 6px;border:1px solid var(--line);border-radius:4px;color:var(--gold)}
+  ::-webkit-scrollbar{width:8px;height:8px}
+  ::-webkit-scrollbar-thumb{background:#1f1f1f;border-radius:4px}
+  ::-webkit-scrollbar-thumb:hover{background:#2a2a2a}
+  ::-webkit-scrollbar-track{background:transparent}
 
-    :root {
-      --bg: #f3f4f6;
-      --line: #e5e7eb;
-      --text: #1f2937;
-      --muted: #6b7280;
-      --accent: #3b82f6;
-      --accent-hover: #2563eb;
-      --black: #111111;
-      --white: #ffffff;
-      --radius: 12px;
-      --shadow-sm: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.025);
-      --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
-      --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.05), 0 4px 6px -2px rgba(0,0,0,0.025);
-      font-family: "Inter", "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Helvetica Neue", Arial, sans-serif;
-    }
+  #app{display:none;height:100dvh;flex-direction:column}
+  #app.on{display:flex}
 
-    html, body {
-      height: 100%;
-      margin: 0;
-      background: var(--bg);
-      color: var(--text);
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-    }
+  /* topbar */
+  #topbar{height:64px;display:flex;align-items:center;gap:14px;padding:0 24px;border-bottom:1px solid var(--line);background:rgba(10,10,10,.85);backdrop-filter:blur(14px);position:sticky;top:0;z-index:10}
+  .brand{display:flex;align-items:center;gap:12px}
+  .brand .logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#1a1a1a,#000);border:1px solid var(--gold);display:flex;align-items:center;justify-content:center;color:var(--gold);font-weight:900;font-size:18px;box-shadow:0 0 18px rgba(212,175,55,.18), inset 0 0 12px rgba(212,175,55,.05);font-family:Inter,sans-serif}
+  .brand .ti{font-size:18px;font-weight:900;letter-spacing:3px;font-family:Inter,sans-serif}
+  .brand .sub{font-size:10px;color:var(--muted);font-weight:600;letter-spacing:3px;text-transform:uppercase;margin-top:2px}
+  .sp{flex:1}
+  .rt{display:flex;align-items:center;gap:8px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;font-weight:700;padding:7px 12px;border:1px solid var(--line);border-radius:999px;background:#000}
+  .rt .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 10px var(--ok)}
+  .rt .dot.ng{background:var(--red);box-shadow:0 0 10px var(--red);animation:bp 1s infinite}
+  @keyframes bp{50%{opacity:.3}}
+  .iconbtn{background:transparent;border:1px solid var(--line);color:var(--muted);cursor:pointer;padding:8px 12px;border-radius:10px;font-size:13px;transition:all .15s}
+  .iconbtn:hover{color:#fff;border-color:#3a3a3a;background:#141414}
 
-    /* 投稿欄の固定を解除し、美しく配置 */
-    .composer-fixed {
-      background: var(--white);
-      border-bottom: 1px solid var(--line);
-      padding: 24px 0;
-      box-shadow: var(--shadow-md);
-      position: relative;
-      z-index: 10;
-    }
-    
-    .composer-inner {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 0 20px;
-      display: flex;
-      gap: 16px;
-      align-items: flex-start;
-    }
+  #mechip{display:flex;align-items:center;gap:10px;padding:5px 12px 5px 5px;border:1px solid var(--line);border-radius:999px;background:#000}
+  #mechip .av{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#222,#000);display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--gold);font-size:13px;border:1px solid var(--line)}
+  #mechip .info{display:flex;flex-direction:column;line-height:1.2;min-width:0;max-width:160px}
+  #mechip .info .nm{font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #mechip .info .sub{font-size:10px;color:var(--muted);letter-spacing:.5px}
+  #mechip button{background:transparent;border:0;color:var(--muted);cursor:pointer;font-size:14px;padding:0 4px}
+  #mechip button:hover{color:var(--red)}
 
-    .composer-avatar {
-      width: 48px;
-      height: 48px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, var(--accent), #8b5cf6);
-      color: #fff;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 700;
-      font-size: 18px;
-      flex-shrink: 0;
-      box-shadow: var(--shadow-sm);
-    }
+  /* main */
+  #content{flex:1;display:flex;min-height:0;max-width:1500px;width:100%;margin:0 auto}
+  #chatpane{flex:1;display:flex;flex-direction:column;min-width:0}
+  #chat{flex:1;overflow-y:auto;padding:24px 0 4px;scroll-behavior:smooth}
 
-    .composer-right {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
+  /* member list */
+  #userpane{width:280px;overflow:auto;padding:24px 14px;border-left:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.012),transparent 30%)}
+  .upane-h{font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;padding:6px 12px 14px;letter-spacing:2.5px;display:flex;justify-content:space-between;align-items:center}
+  .upane-h .cnt{color:var(--gold);font-family:"JetBrains Mono",monospace;letter-spacing:0;font-size:11px}
+  .u{padding:8px 10px;border-radius:10px;display:flex;align-items:center;gap:10px;cursor:default;transition:background .15s}
+  .u:hover{background:#141414}
+  .u .av{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#1f1f1f,#0a0a0a);display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:13px;flex:none;position:relative;border:1px solid var(--line)}
+  .u .av::after{content:"";position:absolute;right:-1px;bottom:-1px;width:10px;height:10px;border-radius:50%;background:var(--ok);border:2px solid var(--bg)}
+  .u .nm{font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 
-    .row {
-      display: flex;
-      gap: 12px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
+  /* badges (Japanese) */
+  .badge{font-size:10px;padding:2px 7px;border-radius:4px;font-weight:800;letter-spacing:1.5px;display:inline-flex;align-items:center;line-height:1.5;border:1px solid transparent;font-family:"Noto Sans JP",sans-serif}
+  .b-founder{background:linear-gradient(135deg,#3a2d05,#1a1304);color:var(--gold);border-color:var(--gold);box-shadow:0 0 12px rgba(212,175,55,.3)}
+  .b-admin{background:#1c1c1c;color:#f5f5f5;border-color:#7a7a7a}
+  .b-deleter{background:#1c1c1c;color:#9ca3af;border-color:#374151}
+  .tag{color:var(--subtle);font-size:11px;font-weight:500;font-family:"JetBrains Mono",Consolas,monospace}
 
-    input[type="text"], textarea, select {
-      width: 100%;
-      padding: 12px 16px;
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      background: #f9fafb;
-      color: var(--text);
-      font-size: 15px;
-      transition: all 0.2s ease;
-      box-sizing: border-box;
-      font-family: inherit;
-    }
+  .rainbow{background:linear-gradient(90deg,#ff6b6b,#ffd93d,#6bcf7f,#4d96ff,#9b59f6,#ff6b6b);background-size:200% auto;-webkit-background-clip:text;background-clip:text;color:transparent;animation:rb 4s linear infinite;font-weight:800}
+  @keyframes rb{to{background-position:200% center}}
 
-    textarea {
-      min-height: 80px;
-      resize: vertical;
-      line-height: 1.5;
-    }
+  /* messages */
+  .msg{padding:2px 24px 2px 78px;position:relative;min-height:22px}
+  .msg.first{margin-top:18px;padding-top:8px;padding-bottom:8px;min-height:48px}
+  .msg.first .av{position:absolute;left:24px;top:10px;width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#1c1c1c,#000);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:15px}
+  .msg .meta{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:3px}
+  .msg .name{font-weight:700;font-size:15px}
+  .msg .time{color:var(--subtle);font-size:11px;font-family:"JetBrains Mono",Consolas,monospace}
+  .msg .ts-inline{position:absolute;left:0;width:70px;text-align:right;color:var(--subtle);font-size:10px;line-height:22px;opacity:0;padding-right:8px;font-family:"JetBrains Mono",Consolas,monospace}
+  .msg:not(.first):hover .ts-inline{opacity:1}
+  .msg .text{color:#d4d4d4;white-space:pre-wrap;word-wrap:break-word;font-size:15px}
+  .msg:hover{background:rgba(255,255,255,.02)}
+  .msg.system .text{color:var(--muted);font-style:italic}
+  .msg.private{background:linear-gradient(90deg,rgba(212,175,55,.09),transparent 80%);border-left:2px solid var(--gold);padding-left:76px}
+  .msg.private .text{color:#fde68a}
+  .msg.dice .text,.msg.omikuji .text{color:#c4b5fd}
 
-    input[type="text"]:focus, textarea:focus, select:focus {
-      outline: none;
-      border-color: var(--accent);
-      background: #fff;
-      box-shadow: 0 0 0 4px rgba(59,130,246,0.15);
-    }
+  /* input */
+  #inputbox{padding:8px 24px 22px;position:relative}
+  #ibwrap{background:var(--input);border:1px solid var(--line);border-radius:14px;padding:2px 14px;display:flex;align-items:center;gap:10px;transition:border-color .15s, box-shadow .15s}
+  #ibwrap:focus-within{border-color:var(--gold);box-shadow:0 0 0 3px rgba(212,175,55,.08)}
+  #inp{flex:1;background:transparent;border:0;outline:0;color:var(--fg);font-size:15px;padding:14px 0;font-family:inherit;min-width:0}
+  #inp::placeholder{color:var(--subtle)}
+  #send{background:transparent;border:0;color:var(--muted);cursor:pointer;padding:8px;border-radius:8px;display:flex;align-items:center;font-size:18px;transition:color .15s}
+  #send:hover{color:var(--gold)}
+  #typing{font-size:12px;color:var(--muted);min-height:20px;padding:6px 26px 0;font-family:"JetBrains Mono",Consolas,monospace;letter-spacing:.3px}
+  #typing .err{color:var(--red)}
+  #typing .ok{color:var(--ok)}
+  #typers{font-size:12px;color:var(--muted);min-height:18px;padding:2px 26px 0;font-family:"JetBrains Mono",Consolas,monospace;display:flex;align-items:center;gap:8px;opacity:0;transition:opacity .2s}
+  #typers.on{opacity:1}
+  #typers .nm{color:#e8e8e8}
+  .tdots{display:inline-flex;gap:3px;align-items:center}
+  .tdots i{width:5px;height:5px;border-radius:50%;background:var(--gold);display:inline-block;animation:tbl 1.2s infinite ease-in-out}
+  .tdots i:nth-child(2){animation-delay:.15s}
+  .tdots i:nth-child(3){animation-delay:.3s}
+  @keyframes tbl{0%,80%,100%{transform:translateY(0);opacity:.35}40%{transform:translateY(-3px);opacity:1}}
+  .reads{margin:2px 0 8px 76px;font-size:10px;color:var(--gold);font-family:"JetBrains Mono",Consolas,monospace;letter-spacing:1.2px;font-weight:700;opacity:.85;text-transform:uppercase;display:flex;align-items:center;gap:6px}
+  .reads::before{content:"✓✓";color:var(--gold);font-size:11px}
 
-    .controls {
-      display: flex;
-      gap: 12px;
-      align-items: center;
-    }
+  /* command palette */
+  #pal{position:absolute;left:24px;right:24px;bottom:78px;background:#070707;border:1px solid var(--line);border-radius:12px;box-shadow:0 16px 56px rgba(0,0,0,.7);max-height:300px;overflow:auto;display:none;z-index:5}
+  #pal.on{display:block}
+  #pal .ph{padding:10px 16px;font-size:10px;text-transform:uppercase;color:var(--muted);font-weight:800;border-bottom:1px solid var(--line);letter-spacing:2px}
+  #pal .it{padding:10px 16px;display:flex;align-items:center;cursor:pointer;font-size:14px;border-bottom:1px solid var(--line2)}
+  #pal .it:last-child{border-bottom:0}
+  #pal .it:hover,#pal .it.sel{background:#141414}
+  #pal .it .cmd{color:#fff;font-weight:700;font-family:"JetBrains Mono",Consolas,monospace}
+  #pal .it .arg{color:var(--gold);font-family:"JetBrains Mono",Consolas,monospace;font-size:12px;margin-left:8px}
+  #pal .it .desc{color:var(--subtle);font-size:11px;margin-left:auto}
 
-    .btn {
-      background: var(--accent);
-      color: #fff;
-      border: none;
-      padding: 10px 18px;
-      border-radius: var(--radius);
-      font-weight: 600;
-      font-size: 14px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      box-shadow: var(--shadow-sm);
-    }
+  /* auth */
+  #auth{position:fixed;inset:0;background:
+    radial-gradient(1000px 600px at 50% -10%, rgba(212,175,55,.14), transparent 60%),
+    radial-gradient(800px 500px at 50% 110%, rgba(255,255,255,.04), transparent 60%),
+    #000;
+    display:flex;align-items:center;justify-content:center;z-index:100;padding:16px}
+  #auth .card{background:linear-gradient(180deg,#0f0f0f,#050505);padding:40px;border-radius:20px;width:100%;max-width:420px;box-shadow:0 30px 80px rgba(0,0,0,.9), 0 0 0 1px var(--line) inset;position:relative;overflow:hidden}
+  #auth .card::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);opacity:.7}
+  #auth h1{margin:0 0 6px;font-size:32px;text-align:center;font-weight:900;letter-spacing:6px;color:#fff;font-family:Inter,sans-serif}
+  #auth h1 .accent{color:var(--gold)}
+  #auth .sub{text-align:center;color:var(--muted);font-size:11px;margin-bottom:28px;letter-spacing:3px;text-transform:uppercase;font-weight:600}
+  #auth .tabs{display:flex;margin-bottom:24px;background:#000;border:1px solid var(--line);border-radius:10px;padding:3px}
+  #auth .tabs button{flex:1;padding:10px;background:transparent;color:var(--muted);border:0;border-radius:7px;cursor:pointer;font-weight:700;font-size:12px;transition:all .2s;letter-spacing:1.5px;text-transform:uppercase}
+  #auth .tabs button.on{background:linear-gradient(180deg,#1f1f1f,#0a0a0a);color:#fff;box-shadow:0 0 0 1px var(--line) inset}
+  #auth label{display:block;font-size:10px;color:var(--muted);margin-top:18px;text-transform:uppercase;font-weight:800;letter-spacing:2px}
+  #auth label .req{color:var(--gold);margin-left:4px}
+  #auth input{width:100%;padding:13px 14px;background:#000;border:1px solid var(--line);color:var(--fg);border-radius:8px;font-size:15px;margin-top:8px;font-family:inherit;outline:none;transition:border-color .15s}
+  #auth input:focus{border-color:var(--gold)}
+  #auth button.go{width:100%;margin-top:26px;padding:14px;background:linear-gradient(180deg,#fff,#d4d4d4);color:#000;border:0;border-radius:10px;font-weight:900;cursor:pointer;font-size:13px;transition:all .2s;letter-spacing:2px;text-transform:uppercase}
+  #auth button.go:hover{background:linear-gradient(180deg,var(--gold),var(--gold2));color:#000;box-shadow:0 8px 24px rgba(212,175,55,.3)}
+  #auth button.go:disabled{opacity:.5;cursor:wait}
+  #auth .err{color:var(--red);margin-top:14px;font-size:13px;min-height:18px;font-weight:600;text-align:center}
+  #auth .help{color:var(--subtle);font-size:11px;margin-top:22px;line-height:1.8;padding-top:16px;border-top:1px solid var(--line)}
 
-    .btn:hover {
-      background: var(--accent-hover);
-      transform: translateY(-1px);
-      box-shadow: var(--shadow-md);
-    }
+  #lock{position:fixed;inset:0;background:#000;color:#fff;display:none;align-items:center;justify-content:center;flex-direction:column;z-index:200;text-align:center;padding:24px}
+  #lock.on{display:flex}
+  #lock h1{color:var(--red);font-size:48px;margin:0 0 12px;letter-spacing:6px;font-family:Inter,sans-serif;font-weight:900}
+  #lock p{color:#666;letter-spacing:1px}
 
-    .btn:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-      transform: none;
-      box-shadow: none;
-    }
-
-    .btn.ghost {
-      background: transparent;
-      border: 1px solid var(--line);
-      color: var(--muted);
-      box-shadow: none;
-    }
-
-    .btn.ghost:hover {
-      background: #f3f4f6;
-      color: var(--text);
-      transform: none;
-    }
-
-    .page-wrap {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 32px 20px 120px !important; 
-      box-sizing: border-box;
-    }
-
-    .split { 
-      display: grid; 
-      grid-template-columns: 1fr 560px; 
-      gap: 24px; 
-      align-items: start; 
-      max-width: 1200px; 
-      margin: 0 auto; 
-    }
-
-    @media(max-width:1100px) { 
-      .split { grid-template-columns: 1fr; } 
-    }
-
-    .chat-column {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      min-height: 320px;
-    }
-
-    .message {
-      display: flex;
-      gap: 16px;
-      padding: 20px;
-      border: 1px solid transparent;
-      border-radius: 16px;
-      align-items: flex-start;
-      background: var(--white);
-      box-shadow: var(--shadow-sm);
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .message:hover {
-      box-shadow: var(--shadow-md);
-      transform: translateY(-2px);
-    }
-
-    .avatar {
-      width: 48px;
-      height: 48px;
-      border-radius: 50%;
-      background: #e5e7eb;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 700;
-      font-size: 16px;
-      color: #4b5563;
-      flex-shrink: 0;
-      transition: 0.2s;
-    }
-
-    .avatar:hover {
-      filter: brightness(0.95);
-    }
-
-    .body {
-      flex: 1;
-      min-width: 0;
-    }
-
-    .meta {
-      display: flex;
-      gap: 12px;
-      align-items: center;
-      margin-bottom: 8px;
-    }
-
-    .name {
-      font-weight: 700;
-      font-size: 15px;
-      color: var(--text);
-      transition: 0.2s;
-    }
-
-    .name:hover {
-      color: var(--accent);
-    }
-
-    .time {
-      color: var(--muted);
-      font-size: 13px;
-    }
-
-    .text {
-      white-space: pre-wrap;
-      color: #374151;
-      line-height: 1.6;
-      font-size: 15px;
-      word-wrap: break-word;
-    }
-
-    .reactions {
-      margin-top: 12px;
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .reaction {
-      border: 1px solid var(--line);
-      background: #f9fafb;
-      padding: 6px 12px;
-      border-radius: 999px;
-      color: var(--muted);
-      font-size: 14px;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      transition: all 0.2s ease;
-    }
-
-    .reaction:hover {
-      background: #fff;
-      border-color: var(--accent);
-      color: var(--accent);
-      box-shadow: var(--shadow-sm);
-    }
-
-    .reaction strong {
-      color: var(--text);
-      font-weight: 700;
-    }
-
-    .admin-badge {
-      display: inline-block;
-      margin-left: 8px;
-      padding: 4px 10px;
-      border-radius: 999px;
-      background: linear-gradient(135deg, #f59e0b, #ea580c);
-      color: #fff;
-      font-weight: 700;
-      font-size: 11px;
-      letter-spacing: 0.5px;
-      box-shadow: var(--shadow-sm);
-    }
-
-    .system-note {
-      background: linear-gradient(to right, #eff6ff, #ffffff);
-      border-left: 4px solid var(--accent);
-      border-radius: 0 16px 16px 0;
-      box-shadow: none;
-    }
-
-    /* オセロパネル */
-    .othello-panel {
-      background: var(--white);
-      border: none;
-      border-radius: 20px;
-      padding: 24px;
-      box-sizing: border-box;
-      box-shadow: var(--shadow-lg);
-      position: sticky;
-      top: 24px;
-    }
-
-    .rooms {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      margin-bottom: 16px;
-      max-height: 400px; /* 多すぎる部屋によるレイアウト崩れ防止 */
-      overflow-y: auto;
-    }
-
-    .room-item {
-      padding: 16px;
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      background: #f9fafb;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      transition: all 0.2s ease;
-    }
-
-    .room-item:hover {
-      border-color: #d1d5db;
-      background: #fff;
-      box-shadow: var(--shadow-sm);
-    }
-
-    .board {
-      display: grid;
-      grid-template-columns: repeat(8, 1fr);
-      grid-template-rows: repeat(8, 1fr);
-      gap: 4px;
-      margin-top: 16px;
-      background: #166534;
-      padding: 8px;
-      border-radius: 12px;
-      box-shadow: inset 0 4px 8px rgba(0,0,0,0.2), 0 8px 16px rgba(0,0,0,0.1);
-      aspect-ratio: 1 / 1;
-    }
-
-    .cell {
-      width: 100%;
-      height: 100%;
-      background: #22c55e;
-      border-radius: 4px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-      cursor: pointer;
-      box-shadow: inset 0 -3px 0 rgba(0,0,0,0.15);
-      transition: background 0.2s;
-    }
-
-    .cell:hover {
-      background: #4ade80;
-    }
-
-    .cell.disabled {
-      cursor: default;
-      opacity: 0.95;
-    }
-
-    .cell.disabled:hover {
-      background: #22c55e;
-    }
-
-    .disc {
-      width: 80%;
-      height: 80%;
-      border-radius: 50%;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.3), inset 0 2px 4px rgba(255,255,255,0.2);
-      transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    }
-
-    .black {
-      background: linear-gradient(145deg, #2b2b2b, #000000);
-    }
-
-    .white {
-      background: linear-gradient(145deg, #ffffff, #e6e6e6);
-      border: none;
-    }
-
-    .last-move {
-      outline: 3px solid #fde047;
-      outline-offset: -3px;
-      border-radius: 4px;
-    }
-
-    .legal-dot {
-      width: 12%;
-      height: 12%;
-      border-radius: 50%;
-      background: rgba(255,255,255,0.6);
-      position: absolute;
-      box-shadow: 0 0 4px rgba(0,0,0,0.2);
-    }
-
-    .turn-indicator {
-      display: flex;
-      gap: 12px;
-      align-items: center;
-      margin-top: 16px;
-      padding: 12px;
-      background: #f3f4f6;
-      border-radius: 12px;
-    }
-
-    .badge {
-      padding: 6px 12px;
-      border-radius: 999px;
-      font-weight: 700;
-      color: #fff;
-      font-size: 13px;
-      box-shadow: var(--shadow-sm);
-    }
-
-    .badge.black {
-      background: #111;
-    }
-
-    .badge.white {
-      background: #fff;
-      color: #111;
-      border: 1px solid #d1d5db;
-    }
-
-    /* 結果アニメーション */
-    .overlay {
-      position: fixed;
-      left: 0;
-      top: 0;
-      right: 0;
-      bottom: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      pointer-events: none;
-      z-index: 2000;
-      background: rgba(0,0,0,0.4);
-      backdrop-filter: blur(4px);
-    }
-
-    .result-card {
-      pointer-events: auto;
-      min-width: 320px;
-      padding: 40px;
-      border-radius: 24px;
-      text-align: center;
-      box-shadow: 0 24px 48px rgba(0,0,0,0.2);
-      transform: translateY(-20px) scale(0.95);
-      opacity: 0;
-      animation: pop 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    }
-
-    .result-card.win {
-      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
-      color: #fff;
-    }
-
-    .result-card.lose {
-      background: linear-gradient(135deg, #4b5563, #1f2937);
-      color: #fff;
-    }
-
-    .result-title {
-      font-size: 32px;
-      font-weight: 900;
-      margin-bottom: 12px;
-      letter-spacing: 1px;
-    }
-
-    .result-sub {
-      font-size: 16px;
-      opacity: 0.9;
-      font-weight: 500;
-    }
-
-    @keyframes pop { 
-      to { transform: translateY(0) scale(1); opacity: 1; } 
-    }
-
-    @media (max-width:768px) {
-      .composer-inner { padding: 0 16px; flex-direction: column; }
-      .composer-avatar { display: none; }
-      .row { flex-direction: column; align-items: stretch; }
-      input[type="text"], select { max-width: none !important; width: 100%; }
-      .controls { width: 100%; justify-content: space-between; }
-      .page-wrap { padding-top: 24px !important; }
-      .split { grid-template-columns: 1fr; gap: 16px; }
-      .othello-panel { position: static; padding: 16px; }
-      .board { gap: 2px; padding: 4px; }
-    }
-  </style>
+  @media(max-width:760px){
+    #userpane{display:none}
+    .msg{padding-left:62px;padding-right:14px}
+    .msg.first .av{left:14px;width:34px;height:34px;font-size:13px}
+    .msg.private{padding-left:60px}
+    #inputbox{padding:6px 12px 14px}
+    #pal{left:12px;right:12px;bottom:74px}
+    #topbar{padding:0 14px;gap:8px;height:58px}
+    .brand .sub{display:none}
+    #mechip .info{display:none}
+  }
+</style>
 </head>
 <body>
-  <div class="composer-fixed" id="composerFixed" role="region" aria-label="投稿欄">
-    <div class="composer-inner">
-      <div class="composer-avatar" id="composerAvatar">U</div>
-      <div class="composer-right">
-        <div class="row">
-          <input id="username" type="text" placeholder="ユーザー名（任意）" style="max-width:260px" maxlength="20" />
-          <input id="seed" type="text" placeholder="seed（任意）" />
-          <button id="toggleOthello" class="btn" style="flex:0 0 auto">オセロ</button>
-          <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
-            <select id="serverSelect" class="btn ghost" style="padding:4px 8px; font-size:13px; height:auto;">
-              <option value="auto">自動切替</option>
-              <option value="https://singing.linco.cl">サーバー1</option>
-              <option value="https://manabis.onrender.com">サーバー2</option>
-              <option value="https://tfr.linco.cl">サーバー3</option>
-            </select>
-            <button id="adminLoginBtn" class="btn ghost">管理者ログイン</button>
-            <button id="adminModalBtn" class="btn" style="display:none">管理モーダルを表示</button>
-            <label id="banToggleLabel" style="display:none;font-size:13px;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="banToggle"> BANボタンを表示</label>
-          </div>
-        </div>
-        <textarea id="messageInput" placeholder="コメントを入力（Shift+Enterで改行、Enterで送信）" maxlength="200"></textarea>
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div style="color:var(--muted);font-size:13px">公開チャットです。節度ある投稿をお願いします。</div>
-          <div class="controls">
-            <button class="btn ghost" id="clearBtn">全削除（管理）</button>
-            <button class="btn" id="sendBtn">送信</button>
-          </div>
+
+<!-- AUTH -->
+<div id="auth">
+  <div class="card">
+    <h1>NO<span class="accent">I</span>R</h1>
+    <div class="sub">Encrypted Chat Lounge</div>
+    <div class="tabs">
+      <button id="t-login" class="on">ログイン</button>
+      <button id="t-signup">サインアップ</button>
+    </div>
+    <label>ユーザー名<span class="req">*</span></label>
+    <input id="a-name" autocomplete="username" maxlength="24" spellcheck="false" />
+    <label>パスワード<span class="req">*</span></label>
+    <input id="a-pw" type="password" autocomplete="current-password" maxlength="128" />
+    <button class="go" id="a-go">ログイン</button>
+    <div class="err" id="a-err"></div>
+    <div class="help">
+      ・名前は 1〜24 文字（日本語OK・記号は <code>_</code> <code>-</code> のみ）<br>
+      ・パスワードは 8 文字以上<br>
+      ・名前の重複は不可<br>
+      ・ログインしない限りチャットは一切表示されません
+    </div>
+  </div>
+</div>
+
+<!-- BAN LOCK -->
+<div id="lock"><div><h1>ACCESS DENIED</h1><p>あなたはこのチャットから禁止されています。</p></div></div>
+
+<!-- APP -->
+<div id="app">
+  <header id="topbar">
+    <div class="brand">
+      <div class="logo">m</div>
+      <div>
+        <div class="ti">min-chat</div>
+        <div class="sub">Encrypted Lounge</div>
+      </div>
+    </div>
+    <div class="sp"></div>
+    <div class="rt"><span class="dot" id="rtdot"></span><span id="rttext">接続中…</span></div>
+    <div id="mechip"></div>
+    <button class="iconbtn" id="togUsers" title="メンバー表示切替">👥</button>
+  </header>
+
+  <div id="content">
+    <div id="chatpane">
+      <div id="chat"></div>
+      <div id="typers"></div>
+      <div id="typing"></div>
+      <div id="inputbox">
+        <div id="pal"></div>
+        <div id="ibwrap">
+          <input id="inp" autocomplete="off" placeholder="メッセージを送る   ( / でコマンド一覧 )" maxlength="300"/>
+          <button id="send" title="送信">➤</button>
         </div>
       </div>
     </div>
+    <aside id="userpane">
+      <div class="upane-h"><span>オンライン</span><span class="cnt" id="cnt">0</span></div>
+      <div id="userlist"></div>
+    </aside>
   </div>
+</div>
 
-  <div id="mainWrap" class="page-wrap" role="main">
-    <div id="errorAlert" style="display:none; background:#fee2e2; color:#b91c1c; padding:12px; border-radius:8px; margin-bottom:16px; border:1px solid #fca5a5;"></div>
+<script type="module">
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-    <div id="splitContainer">
-      <div id="chatColumn" class="chat-column" aria-live="polite" aria-atomic="false"></div>
+const SUPABASE_URL = "https://gqdeacoiowmdjudekvij.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdxZGVhY29pb3dtZGp1ZGVrdmlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwNzY5ODUsImV4cCI6MjA5NTY1Mjk4NX0.0rzuAPLV-HXDZ5OYNEi9lezwpb9ZOQBXEeKAyW3Du08";
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth:{ persistSession:true, autoRefreshToken:true }});
 
-      <aside id="othelloPanel" class="othello-panel" style="display:none" aria-hidden="true">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div style="font-weight:700">オセロ</div>
-          <div style="color:var(--muted)">部屋を作成して待機、他のユーザーが参加すると対戦が始まります。観戦も可能です。</div>
-        </div>
+const $ = q => document.querySelector(q);
+const esc = s => (s==null?"":String(s)).replace(/[&<>"'`]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;","`":"&#96;"}[c]));
+const stripCtl = s => (s||"").replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g,"");
 
-        <div id="roomsControls" style="margin-top:8px">
-          <div style="display:flex;gap:8px;margin-bottom:8px">
-            <input id="roomInput" placeholder="部屋ID（任意）" style="flex:1;padding:8px;border:1px solid var(--line);border-radius:8px" maxlength="30" />
-            <button id="createRoomBtn" class="btn">新しく作る</button>
-            <button id="refreshRoomsBtn" class="btn ghost">更新</button>
-          </div>
-          <div class="rooms" id="roomsList" aria-live="polite"></div>
-        </div>
+const NAME_RE = /^[\p{L}\p{N}_\-]{1,24}$/u;
+const HEX_RE  = /^#[0-9a-fA-F]{6}$/;
 
-        <div id="gameArea" style="display:none;margin-top:8px">
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <div style="font-weight:700" id="currentRoomLabel">部屋: -</div>
-            <div class="info" id="playersLabel">参加者: -</div>
-          </div>
+const nameToEmail = n => "u_" + btoa(unescape(encodeURIComponent(n))).replace(/[^a-zA-Z0-9]/g,"").toLowerCase().slice(0,40) + "@chat.local";
 
-          <div class="turn-indicator" id="turnIndicator">
-            <div class="label">現在の手番</div>
-            <div id="turnBadge" class="badge" style="margin-left:8px"></div>
-            <div style="margin-left:auto">
-              <span class="badge black">黒</span>
-              <span style="width:8px;display:inline-block"></span>
-              <span class="badge white" style="color:#111;border:1px solid #ccc">白</span>
-            </div>
-          </div>
+let me=null, myIgnores=new Set(), chCh=null, prCh=null;
+let lastSenderId=null, lastSenderTime=0;
+const COMMANDS = [
+  {c:"help",a:"",d:"コマンド一覧"},
+  {c:"omi",a:"",d:"おみくじ(1日1回)"},
+  {c:"color",a:"#RRGGBB | rainbow",d:"名前の色を変更"},
+  {c:"dice",a:"個数 上限",d:"サイコロ (例: /dice 2 6)"},
+  {c:"ignore",a:"名前",d:"指定ユーザーを自分には非表示"},
+  {c:"unignore",a:"名前",d:"非表示を解除 (管理者+)"},
+  {c:"prm",a:"名前 メッセージ",d:"プライベートメッセージ"},
+  {c:"nick",a:"",d:"自分のタグ/役職を隠す (管理者+)"},
+  {c:"clear",a:"",d:"チャット全消去 (deleter+)"},
+  {c:"delete",a:"名前",d:"対象の発言を全削除 (deleter+)"},
+  {c:"mute",a:"名前 ?d?h?m",d:"対象をミュート (deleter+)"},
+  {c:"ipmute",a:"名前 ?d?h?m",d:"IPベースでミュート (管理者+)"},
+  {c:"unmute",a:"名前",d:"ミュート解除 (管理者+)"},
+  {c:"ban",a:"名前",d:"対象をBAN (管理者+)"},
+  {c:"unban",a:"名前",d:"BAN解除 (管理者+)"},
+  {c:"ipignore",a:"名前",d:"対象を全体に非表示 (管理者+)"},
+  {c:"addd",a:"名前",d:"deleter付与 (管理者+)"},
+  {c:"adda",a:"名前",d:"管理者付与 (創設者)"},
+  {c:"remove",a:"名前",d:"権限剥奪"},
+  {c:"dp",a:"名前",d:"IP暴露+BAN (創設者)"},
+  {c:"sys-check",a:"",d:"システム確認 (創設者)"},
+  {c:"sys-clone",a:"",d:"スナップショット (創設者)"},
+  {c:"sys-roll",a:"",d:"ロールバック (創設者)"},
+];
 
-          <div id="board" class="board" role="grid" aria-label="オセロ盤"></div>
+// ===== AUTH =====
+let mode = "login";
+const setMode = m => {
+  mode = m;
+  $("#t-login").classList.toggle("on", m==="login");
+  $("#t-signup").classList.toggle("on", m==="signup");
+  $("#a-go").textContent = m==="login" ? "ログイン" : "アカウント作成";
+  $("#a-pw").autocomplete = m==="login" ? "current-password" : "new-password";
+};
+$("#t-login").onclick = ()=>setMode("login");
+$("#t-signup").onclick = ()=>setMode("signup");
+$("#a-name").onkeydown = e => { if(e.key==="Enter") $("#a-pw").focus(); };
+$("#a-pw").onkeydown   = e => { if(e.key==="Enter") $("#a-go").click(); };
 
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
-            <div class="info" id="statusLabel">状態: -</div>
-            <div>
-              <button id="joinGameBtn" class="btn">対戦参加</button>
-              <button id="leaveRoomBtn" class="btn ghost">退出</button>
-            </div>
-          </div>
-          <div class="info" id="countsLabel" style="margin-top:8px">黒: 0 / 白: 0</div>
-        </div>
-      </aside>
-    </div>
-  </div>
-
-  <div id="overlay" class="overlay" style="display:none"></div>
-
-  <script>
-    const SERVERS = [
-      'https://singing.linco.cl',
-      'https://manabis.onrender.com',
-      'https://tfr.linco.cl'
-    ];
-    let BASE = localStorage.getItem('selectedServer');
-    let isAutoServer = false;
-    if (!BASE || BASE === 'auto') {
-      BASE = SERVERS[0];
-      isAutoServer = true;
-    }
-
-    const socket = io(BASE, { transports: ['websocket','polling'] });
-
-    if (isAutoServer) {
-      (async () => {
-        for (const s of SERVERS) {
-          try {
-            const controller = new AbortController();
-            const id = setTimeout(() => controller.abort(), 2000);
-            const res = await fetch(s + '/api/messages', { signal: controller.signal });
-            clearTimeout(id);
-            if (res.ok) {
-              if (BASE !== s) {
-                BASE = s;
-                socket.io.uri = s;
-                socket.disconnect().connect();
-                loadMessages();
-                fetchRooms();
-                fetch(BASE + '/api/admins').then(r=>r.json()).then(d=>adminList=d).catch(()=>{});
-              }
-              break;
-            }
-          } catch(e) {}
-        }
-      })();
-    }
-
-    /* Elements */
-    const composerFixed = document.getElementById('composerFixed');
-    const pageWrap = document.getElementById('mainWrap');
-    const chatColumn = document.getElementById('chatColumn');
-    const sendBtn = document.getElementById('sendBtn');
-    const usernameInput = document.getElementById('username');
-    const messageInput = document.getElementById('messageInput');
-    const seedInput = document.getElementById('seed');
-    const composerAvatar = document.getElementById('composerAvatar');
-    const clearBtn = document.getElementById('clearBtn');
-    const toggleOthelloBtn = document.getElementById('toggleOthello');
-    const adminLoginBtn = document.getElementById('adminLoginBtn');
-    const adminModalBtn = document.getElementById('adminModalBtn');
-    const banToggleLabel = document.getElementById('banToggleLabel');
-    const banToggle = document.getElementById('banToggle');
-    const serverSelect = document.getElementById('serverSelect');
-
-    const othelloPanel = document.getElementById('othelloPanel');
-    const roomsList = document.getElementById('roomsList');
-    const createRoomBtn = document.getElementById('createRoomBtn');
-    const refreshRoomsBtn = document.getElementById('refreshRoomsBtn');
-    const roomInput = document.getElementById('roomInput');
-    const gameArea = document.getElementById('gameArea');
-    const currentRoomLabel = document.getElementById('currentRoomLabel');
-    const playersLabel = document.getElementById('playersLabel');
-    const boardEl = document.getElementById('board');
-    const statusLabel = document.getElementById('statusLabel');
-    const countsLabel = document.getElementById('countsLabel');
-    const joinGameBtn = document.getElementById('joinGameBtn');
-    const leaveRoomBtn = document.getElementById('leaveRoomBtn');
-    const roomsControls = document.getElementById('roomsControls');
-    const turnBadge = document.getElementById('turnBadge');
-    const overlay = document.getElementById('overlay');
-    const errorAlert = document.getElementById('errorAlert');
-
-    let messages = [];
-    let currentRoom = null;
-    let gameState = null;
-    let myColor = null;
-    let adminList = [];
-    let adminRedirectUrl = null;
-
-    /* エラー通知表示関数 */
-    function showError(msg) {
-      errorAlert.textContent = msg;
-      errorAlert.style.display = 'block';
-      setTimeout(() => { errorAlert.style.display = 'none'; }, 5000);
-    }
-
-    /* Server Select Logic */
-    if (localStorage.getItem('selectedServer')) {
-      serverSelect.value = localStorage.getItem('selectedServer');
+$("#a-go").onclick = async () => {
+  const name = $("#a-name").value.trim();
+  const pw = $("#a-pw").value;
+  $("#a-err").textContent="";
+  if(!NAME_RE.test(name)){ $("#a-err").textContent="名前は1〜24文字の文字・数字・_-のみ"; return; }
+  if(pw.length < 8){ $("#a-err").textContent="パスワードは8文字以上"; return; }
+  if(pw.length > 128){ $("#a-err").textContent="パスワードが長すぎます"; return; }
+  const email = nameToEmail(name);
+  const btn = $("#a-go"); btn.disabled = true;
+  try{
+    if(mode==="signup"){
+      const { data: ex } = await sb.from("profiles").select("user_id").eq("name", name).maybeSingle();
+      if(ex){ $("#a-err").textContent="その名前は既に使用されています"; return; }
+      const { error } = await sb.auth.signUp({ email, password: pw, options:{ data:{ name } } });
+      if(error) throw error;
     } else {
-      serverSelect.value = 'auto';
+      const { error } = await sb.auth.signInWithPassword({ email, password: pw });
+      if(error) throw new Error("名前またはパスワードが違います");
     }
-    serverSelect.addEventListener('change', (e) => {
-      if (e.target.value === 'auto') {
-        localStorage.removeItem('selectedServer');
-      } else {
-        localStorage.setItem('selectedServer', e.target.value);
-      }
-      location.reload();
-    });
+    await boot();
+  } catch(e){ $("#a-err").textContent = e.message || String(e); }
+  finally{ btn.disabled = false; }
+};
 
-    /* Utilities */
-    function avatarText(name){ if(!name) return 'U'; return name.trim().slice(0,2).toUpperCase(); }
-    function formatTime(ts){ try{ return new Date(ts).toLocaleString(); }catch(e){ return ts; } }
-    function escapeHtml(s){ return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
+// ===== BOOT =====
+async function boot(){
+  const { data:{ session } } = await sb.auth.getSession();
+  if(!session){ $("#auth").style.display="flex"; $("#app").classList.remove("on"); return; }
+  const { data, error } = await sb.rpc("login_check");
+  if(error){ $("#a-err").textContent = error.message; return; }
+  if(!data.ok){
+    if(data.error==="banned"){ $("#lock").classList.add("on"); await sb.auth.signOut().catch(()=>{}); return; }
+    $("#a-err").textContent = data.error;
+    return;
+  }
+  me = data.profile;
+  $("#auth").style.display="none";
+  $("#app").classList.add("on");
+  renderMe();
+  await loadIgnores();
+  await loadMessages();
+  await loadUsers();
+  subscribe();
+  $("#chat").addEventListener("scroll", scheduleReadSync, { passive:true });
+  window.addEventListener("focus", scheduleReadSync);
+  window.addEventListener("pagehide", stopTyping);
+  $("#inp").focus();
+}
 
-    /* Impersonation Prevention: Seed Encryption Logic */
-    async function getEncryptedSeed(seed) {
-      if (!seed) return "（Seed未設定：匿名ユーザー）";
-      const msgUint8 = new TextEncoder().encode(seed);
-      const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 16);
+function roleBadge(r){
+  if(r==="founder") return `<span class="badge b-founder">創設者</span>`;
+  if(r==="admin")   return `<span class="badge b-admin">管理者</span>`;
+  if(r==="deleter") return `<span class="badge b-deleter">DELETER</span>`;
+  return "";
+}
+function safeColor(c){ return HEX_RE.test(c||"") ? c : (c==="rainbow"?"rainbow":"#ffffff"); }
+function nameHtml(name, color){
+  const c = safeColor(color);
+  if(c==="rainbow") return `<span class="rainbow">${esc(name)}</span>`;
+  return `<span style="color:${c}">${esc(name)}</span>`;
+}
+
+function renderMe(){
+  const hideTag = me.nick_hidden || me.role==="founder";
+  const tag = hideTag ? "" : `<span class="tag">#${String(me.tag).padStart(5,"0")}</span>`;
+  const badge = me.nick_hidden ? "" : roleBadge(me.role);
+  const initial = esc((me.name||"?").slice(0,1));
+  $("#mechip").innerHTML = `
+    <div class="av">${initial}</div>
+    <div class="info">
+      <div class="nm">${nameHtml(me.name, me.name_color)} ${badge}</div>
+      <div class="sub">${tag} オンライン</div>
+    </div>
+    <button id="logout" title="ログアウト">⏻</button>`;
+  $("#logout").onclick = async () => { await sb.auth.signOut(); location.reload(); };
+}
+
+async function loadIgnores(){
+  const { data } = await sb.from("ignores").select("target_user_id").eq("by_user_id", me.user_id);
+  myIgnores = new Set((data||[]).map(x=>x.target_user_id));
+}
+
+async function loadMessages(){
+  const { data, error } = await sb.from("messages").select("*").order("id",{ascending:true}).limit(200);
+  if(error){ console.error(error); return; }
+  $("#chat").innerHTML="";
+  lastSenderId=null; lastSenderTime=0;
+  (data||[]).forEach(addMsg);
+  scrollBot(true);
+}
+
+async function loadUsers(){
+  const { data } = await sb.from("profiles").select("user_id,name,tag,role,name_color,nick_hidden").order("name");
+  const ul = $("#userlist"); ul.innerHTML="";
+  const list = (data||[]);
+  const rank = r => r==="founder"?4:r==="admin"?3:r==="deleter"?2:1;
+  list.sort((a,b)=>rank(b.role)-rank(a.role) || a.name.localeCompare(b.name,"ja"));
+  list.forEach(u=>{
+    const hideTag = u.nick_hidden || u.role==="founder";
+    const tag = hideTag ? "" : `<span class="tag">#${String(u.tag).padStart(5,"0")}</span>`;
+    const badge = u.nick_hidden ? "" : roleBadge(u.role);
+    const d = document.createElement("div");
+    d.className = "u";
+    d.innerHTML = `<div class="av">${esc((u.name||"?").slice(0,1))}</div><div class="nm">${nameHtml(u.name,u.name_color)} ${tag} ${badge}</div>`;
+    ul.appendChild(d);
+  });
+  $("#cnt").textContent = String(list.length).padStart(2,"0");
+}
+
+function fmtTime(d){ return new Date(d).toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"}); }
+function fmtDay(d){ const x=new Date(d); return `${x.getMonth()+1}/${x.getDate()} ${fmtTime(d)}`; }
+
+let latestMsgId = 0;
+function addMsg(m){
+  if(m.hidden_global) return;
+  if(myIgnores.has(m.user_id)) return;
+  if(m.kind==="private" && m.user_id!==me.user_id && m.target_user_id!==me.user_id) return;
+
+  const t = new Date(m.created_at).getTime();
+  const grouped = (m.user_id===lastSenderId) && (t-lastSenderTime < 5*60*1000) && m.kind!=="private";
+  lastSenderId = m.user_id; lastSenderTime = t;
+
+  const hideTag = m.nick_hidden_snapshot || m.role_snapshot==="founder" || !m.tag_snapshot;
+  const tag = hideTag ? "" : `<span class="tag">#${String(m.tag_snapshot).padStart(5,"0")}</span>`;
+  const badge = m.nick_hidden_snapshot ? "" : roleBadge(m.role_snapshot);
+  const prefix = m.kind==="private" ? (m.target_user_id===me.user_id?`📨 from `:`📨 to `) : "";
+  const initial = esc((m.name_snapshot||"?").slice(0,1));
+
+  const el = document.createElement("div");
+  el.className = "msg " + (m.kind||"chat") + (grouped?"":" first");
+  el.dataset.id = m.id;
+  el.dataset.uid = m.user_id || "";
+  el.dataset.kind = m.kind || "chat";
+  if(grouped){
+    el.innerHTML = `<span class="ts-inline">${fmtTime(m.created_at)}</span><div class="text">${esc(stripCtl(m.content))}</div>`;
+  } else {
+    el.innerHTML = `
+      <div class="av">${initial}</div>
+      <div class="meta">${prefix}<span class="name">${nameHtml(m.name_snapshot,m.color_snapshot)}</span>${tag} ${badge} <span class="time">${fmtDay(m.created_at)}</span></div>
+      <div class="text">${esc(stripCtl(m.content))}</div>`;
+  }
+  $("#chat").appendChild(el);
+  if(m.id > latestMsgId) latestMsgId = m.id;
+  scheduleReadSync();
+  updateReadBadges();
+}
+
+function scrollBot(force){
+  const c=$("#chat");
+  const near = c.scrollHeight - c.scrollTop - c.clientHeight < 200;
+  if(force || near){ c.scrollTop = c.scrollHeight; scheduleReadSync(); }
+}
+
+function setRt(ok, label){
+  $("#rtdot").classList.toggle("ng", !ok);
+  $("#rttext").textContent = label || (ok?"LIVE":"OFFLINE");
+}
+
+function subscribe(){
+  if(chCh) sb.removeChannel(chCh);
+  chCh = sb.channel("messages-rt")
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"messages"}, p=>{ addMsg(p.new); scrollBot(); })
+    .on("postgres_changes",{event:"DELETE",schema:"public",table:"messages"}, p=>{
+      const el=document.querySelector(`.msg[data-id="${p.old.id}"]`); if(el) el.remove();
+    })
+    .subscribe(s=>{ setRt(s==="SUBSCRIBED", s==="SUBSCRIBED"?"LIVE":"接続中…"); });
+  if(prCh) sb.removeChannel(prCh);
+  prCh = sb.channel("profiles-rt")
+    .on("postgres_changes",{event:"*",schema:"public",table:"profiles"}, async ()=>{
+      await loadUsers();
+      const { data } = await sb.rpc("login_check");
+      if(data?.ok){ me = data.profile; renderMe(); }
+    }).subscribe();
+  setupTyping();
+  setupReads();
+}
+
+// ===== TYPING INDICATOR (optimized) =====
+// - throttle broadcasts (>=2s gap)
+// - auto-stop after 2s idle
+// - stop on blur / page hidden / send
+// - only fire when text actually changed
+let tyCh=null, lastTypingSent=0, lastTypingText="", typingIdleTimer=null, typingActive=false;
+const typers = new Map(); // user_id -> {name,color,exp}
+function renderTypers(){
+  const now=Date.now();
+  let changed=false;
+  for(const [k,v] of typers) if(v.exp<now){ typers.delete(k); changed=true; }
+  const list=[...typers.values()];
+  const el=$("#typers");
+  if(!list.length){ el.classList.remove("on"); el.innerHTML=""; return; }
+  const names = list.slice(0,3).map(v=>`<span class="nm">${nameHtml(v.name,v.color)}</span>`).join("、");
+  const extra = list.length>3 ? ` 他${list.length-3}人` : "";
+  el.innerHTML = `<span class="tdots"><i></i><i></i><i></i></span><span>${names}${extra} が入力中…</span>`;
+  el.classList.add("on");
+}
+setInterval(renderTypers, 1500);
+function setupTyping(){
+  if(tyCh) sb.removeChannel(tyCh);
+  tyCh = sb.channel("typing-rt", { config:{ broadcast:{ self:false }}});
+  tyCh.on("broadcast",{event:"t"}, ({payload})=>{
+    if(!payload || payload.id===me.user_id) return;
+    if(myIgnores.has(payload.id)) return;
+    typers.set(payload.id, { name:payload.name, color:payload.color, exp:Date.now()+4000 });
+    renderTypers();
+  });
+  tyCh.on("broadcast",{event:"st"}, ({payload})=>{
+    if(!payload) return;
+    typers.delete(payload.id); renderTypers();
+  });
+  tyCh.subscribe();
+}
+function sendTyping(text){
+  if(!tyCh||!me) return;
+  if(text===lastTypingText) { armTypingIdle(); return; }
+  lastTypingText = text;
+  const now=Date.now();
+  if(typingActive && now-lastTypingSent < 2000){ armTypingIdle(); return; }
+  lastTypingSent=now; typingActive=true;
+  tyCh.send({ type:"broadcast", event:"t", payload:{ id:me.user_id, name:me.name, color:me.name_color }});
+  armTypingIdle();
+}
+function armTypingIdle(){
+  if(typingIdleTimer) clearTimeout(typingIdleTimer);
+  typingIdleTimer = setTimeout(stopTyping, 2200);
+}
+function stopTyping(){
+  if(typingIdleTimer){ clearTimeout(typingIdleTimer); typingIdleTimer=null; }
+  if(!tyCh||!me||!typingActive) return;
+  typingActive=false; lastTypingSent=0; lastTypingText="";
+  tyCh.send({ type:"broadcast", event:"st", payload:{ id:me.user_id }});
+}
+
+// ===== READ RECEIPTS (既読) — broadcast based, no DB =====
+let rdCh=null, myLastRead=0, lastReadSent=0, readSyncTimer=null;
+const reads = new Map(); // user_id -> last_read_msg_id
+function setupReads(){
+  if(rdCh) sb.removeChannel(rdCh);
+  rdCh = sb.channel("reads-rt", { config:{ broadcast:{ self:false }}});
+  rdCh.on("broadcast",{event:"r"}, ({payload})=>{
+    if(!payload || payload.id===me.user_id) return;
+    if(myIgnores.has(payload.id)) return;
+    const prev = reads.get(payload.id)||0;
+    if(payload.n > prev){ reads.set(payload.id, payload.n); updateReadBadges(); }
+  });
+  rdCh.on("broadcast",{event:"hi"}, ()=>{ // newcomer: rebroadcast current
+    if(myLastRead) sendRead(true);
+  });
+  rdCh.subscribe(s=>{
+    if(s==="SUBSCRIBED"){
+      rdCh.send({type:"broadcast",event:"hi",payload:{id:me.user_id}});
+      if(myLastRead) sendRead(true);
     }
-
-    async function showUserIdentity(seed, username) {
-      const encrypted = await getEncryptedSeed(seed);
-      alert(`ユーザー認証情報\n------------------------\n名前: ${username || '匿名'}\n識別子: ${encrypted}\n\n※この「識別子」はSeedから生成されます。同じ名前でも識別子が異なれば別人です。`);
+  });
+}
+function scheduleReadSync(){
+  if(document.hidden) return;
+  if(readSyncTimer) return;
+  readSyncTimer = setTimeout(()=>{
+    readSyncTimer=null;
+    const c=$("#chat");
+    const atBottom = c.scrollHeight - c.scrollTop - c.clientHeight < 120;
+    if(atBottom && latestMsgId>myLastRead){
+      myLastRead = latestMsgId;
+      sendRead(false);
+      updateReadBadges();
     }
+  }, 400);
+}
+function sendRead(force){
+  if(!rdCh||!me||!myLastRead) return;
+  const now=Date.now();
+  if(!force && now-lastReadSent < 1200) return;
+  lastReadSent=now;
+  rdCh.send({type:"broadcast",event:"r",payload:{id:me.user_id, n:myLastRead}});
+}
+function updateReadBadges(){
+  if(!me) return;
+  // remove existing badges
+  document.querySelectorAll("#chat .reads").forEach(el=>el.remove());
+  // find last own non-private msg
+  const own = [...document.querySelectorAll(`#chat .msg[data-uid="${me.user_id}"]`)]
+    .filter(el=>el.dataset.kind!=="private");
+  if(!own.length) return;
+  const last = own[own.length-1];
+  const lastId = Number(last.dataset.id||0);
+  if(!lastId) return;
+  let n=0;
+  for(const [uid,rid] of reads){ if(uid!==me.user_id && rid>=lastId) n++; }
+  if(n<=0) return;
+  const tag = document.createElement("div");
+  tag.className="reads";
+  tag.textContent = `既読 ${n}`;
+  last.after(tag);
+}
+document.addEventListener("visibilitychange", ()=>{
+  if(!document.hidden) scheduleReadSync();
+});
 
-    /* Ensure composer doesn't overlap content */
-    function adjustPagePadding(){
-      const h = composerFixed.getBoundingClientRect().height;
-      pageWrap.style.paddingTop = (h + 20) + 'px';
+// 3-min health check
+setInterval(async ()=>{
+  const t0=Date.now(); const ch=sb.channel("ping-"+t0); let got=false;
+  ch.on("broadcast",{event:"p"},()=>{ got=true; });
+  await ch.subscribe(async s=>{
+    if(s==="SUBSCRIBED"){
+      await ch.send({type:"broadcast",event:"p",payload:{}});
+      setTimeout(async ()=>{
+        if(got) setRt(true, "LIVE "+new Date().toLocaleTimeString("ja-JP"));
+        else { setRt(false,"⚠ ROLLBACK"); if(me?.role==="founder") await sb.rpc("run_command",{p_cmd:"sys-roll",p_args:""}); }
+        sb.removeChannel(ch);
+      }, 1500);
     }
-    window.addEventListener('resize', adjustPagePadding);
-    window.addEventListener('load', adjustPagePadding);
-    new ResizeObserver(adjustPagePadding).observe(composerFixed);
+  });
+}, 180000);
 
-    /* Reaction button factory */
-    function createReactionButton(emoji, count, messageId){
-      const btn = document.createElement('button');
-      btn.className = 'reaction';
-      btn.innerHTML = `${emoji} <strong>${count}</strong>`;
-      btn.addEventListener('click', () => {
-        socket.emit('updateReaction', { messageId, reaction: emoji });
-      });
-      return btn;
+// Command palette
+function renderPal(prefix){
+  const items = COMMANDS.filter(x=>x.c.startsWith(prefix));
+  if(!items.length){ $("#pal").classList.remove("on"); return; }
+  $("#pal").innerHTML = `<div class="ph">コマンド  matches /${esc(prefix)}</div>` +
+    items.map((x,i)=>`<div class="it${i===0?" sel":""}" data-c="${esc(x.c)}"><div><span class="cmd">/${esc(x.c)}</span><span class="arg">${esc(x.a)}</span></div><span class="desc">${esc(x.d)}</span></div>`).join("");
+  $("#pal").classList.add("on");
+  $("#pal").querySelectorAll(".it").forEach(el=>{
+    el.onclick = ()=>{ $("#inp").value = "/"+el.dataset.c+" "; $("#pal").classList.remove("on"); $("#inp").focus(); };
+  });
+}
+$("#inp").addEventListener("input", e=>{
+  const v = e.target.value;
+  if(v.startsWith("/") && !/\s/.test(v)) renderPal(v.slice(1).toLowerCase());
+  else $("#pal").classList.remove("on");
+  const trimmed = v.trim();
+  if(trimmed && !v.startsWith("/")) sendTyping(trimmed);
+  else stopTyping();
+});
+$("#inp").addEventListener("blur", stopTyping);
+$("#inp").addEventListener("keydown", e=>{
+  if(e.key==="Escape"){ $("#pal").classList.remove("on"); }
+});
+
+function flash(msg, kind){ const t=$("#typing"); t.innerHTML = `<span class="${kind||"err"}">${esc(msg)}</span>`; setTimeout(()=>{ t.innerHTML=""; }, 4000); }
+
+document.getElementById("send").onclick = submit;
+$("#inp").addEventListener("keydown", e=>{ if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); submit(); }});
+
+async function submit(){
+  let v = stripCtl($("#inp").value).trim();
+  if(!v) return;
+  if(v.length > 300){ flash("300字以上は送信不可"); return; }
+  $("#inp").value=""; $("#pal").classList.remove("on"); stopTyping();
+
+  if(v.startsWith("/")){
+    const sp = v.indexOf(" ");
+    const cmd = (sp<0?v.slice(1):v.slice(1,sp)).toLowerCase();
+    const args = sp<0?"":v.slice(sp+1);
+    if(cmd==="help"){
+      flash("コマンド: " + COMMANDS.map(x=>"/"+x.c).join(" "), "ok"); return;
     }
-
-    /* Render a single message and prepend to top */
-    function appendMessageElement(m){
-      const item = document.createElement('article');
-      item.className = 'message';
-      item.setAttribute('data-id', m.id);
-
-      const av = document.createElement('div'); 
-      av.className = 'avatar'; 
-      av.textContent = avatarText(m.username);
-      av.style.cursor = 'pointer';
-      av.title = '識別子を表示';
-      av.onclick = () => showUserIdentity(m.seed, m.username);
-
-      const body = document.createElement('div'); body.className = 'body';
-      const meta = document.createElement('div'); meta.className = 'meta';
-      
-      const name = document.createElement('div'); 
-      name.className = 'name'; 
-      name.textContent = m.username || '匿名';
-      name.style.cursor = 'pointer';
-      name.title = '識別子を表示';
-      name.onclick = () => showUserIdentity(m.seed, m.username);
-
-      if(m.isAdmin === true){
-        const badge = document.createElement('span'); badge.className = 'admin-badge'; badge.textContent = '管理者';
-        name.appendChild(badge);
-      }
-
-      if(banToggle && banToggle.checked && m.username !== 'システム' && !m.isAdmin){
-        const banBtn = document.createElement('button');
-        banBtn.textContent = 'BAN';
-        banBtn.style.cssText = 'margin-left:8px; padding:2px 6px; background:#dc3545; color:#fff; border:none; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;';
-        banBtn.onclick = (e) => {
-          e.stopPropagation();
-          if(confirm(`ユーザー「${m.username || '匿名'}」をBANしますか？`)){
-            socket.emit('banUser', { username: m.username, seed: m.seed });
-          }
-        };
-        name.appendChild(banBtn);
-      }
-
-      const time = document.createElement('div'); time.className = 'time'; time.textContent = formatTime(m.time);
-      meta.appendChild(name); meta.appendChild(time);
-
-      const text = document.createElement('div'); text.className = 'text'; text.textContent = m.message;
-
-      const reactions = document.createElement('div'); reactions.className = 'reactions';
-      const defaultEmojis = ['👍','❤️','😂','😮','😢','😡'];
-      const currentReactions = m.reactions || {};
-      defaultEmojis.forEach(emoji => {
-        const count = currentReactions[emoji] || 0;
-        reactions.appendChild(createReactionButton(emoji, count, m.id));
-      });
-      Object.keys(currentReactions).forEach(k => {
-        if(defaultEmojis.includes(k)) return;
-        const count = currentReactions[k] || 0;
-        reactions.appendChild(createReactionButton(k, count, m.id));
-      });
-
-      body.appendChild(meta); body.appendChild(text); body.appendChild(reactions);
-      item.appendChild(av); item.appendChild(body);
-
-      if(m.username === 'システム'){
-        item.classList.add('system-note');
-      }
-
-      chatColumn.prepend(item);
+    if(cmd==="color" && args && args!=="rainbow" && !HEX_RE.test(args.trim())){
+      flash("色は #RRGGBB か rainbow"); return;
     }
-
-    /* Load messages from REST */
-    async function loadMessages(){
-      try{
-        const res = await fetch(BASE + '/api/messages');
-        if(!res.ok) throw new Error('failed');
-        messages = await res.json();
-        chatColumn.querySelectorAll('.message, .system-note').forEach(n => n.remove());
-        for(let i = 0; i < messages.length; i++) appendMessageElement(messages[i]);
-        adjustPagePadding();
-      }catch(e){ console.error(e); }
+    const { data, error } = await sb.rpc("run_command", { p_cmd: cmd, p_args: args });
+    if(error){ flash(error.message); return; }
+    if(!data.ok) flash(data.error);
+    else if(data.result) flash("🎴 "+data.result, "ok");
+    if(cmd==="ignore"||cmd==="unignore") await loadIgnores();
+    if(cmd==="color"||cmd==="nick"){
+      const { data:d2 } = await sb.rpc("login_check"); if(d2?.ok){ me=d2.profile; renderMe(); }
     }
-
-    /* Post message via REST */
-    async function postMessage(){
-      const username = usernameInput.value.trim() || '匿名';
-      const message = messageInput.value.trim();
-      const seed = seedInput.value.trim() || '';
-      if(!message) return;
-      const payload = { username, message, time: new Date().toISOString(), seed };
-      try{
-        const res = await fetch(BASE + '/api/messages', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
-        });
-        if(!res.ok){ const err = await res.json(); showError(err.error || '送信に失敗しました'); return; }
-        messageInput.value = '';
-      }catch(e){ console.error(e); showError('通信エラーが発生しました'); }
+  } else {
+    const { data, error } = await sb.rpc("send_message", { p_content: v });
+    if(error){ flash(error.message); return; }
+    if(!data.ok){
+      const map = {muted:"ミュート中です",banned:"BANされています",too_long:"300字以上は送信できません",too_fast:"3秒以内の連投は禁止",duplicate:"直前と同じ内容は送れません",zalgo:"zalgo文字は禁止",forbidden_link:"html.cafe リンクは禁止",empty:"空メッセージ",not_logged_in:"ログインしていません"};
+      flash(map[data.error]||data.error);
     }
+  }
+}
 
-    /* Clear messages (admin) */
-    async function clearAll(){
-      const pwd = prompt('管理パスワードを入力してください'); if(!pwd) return;
-      try{
-        const res = await fetch(BASE + '/api/pass', {
-          method: 'POST', headers: { 'Content-Type': 'application/json', 'x-requested-with': 'fetch' },
-          body: JSON.stringify({ password: pwd })
-        });
-        const data = await res.json();
-        if(res.ok){ alert(data.message || '削除しました'); chatColumn.querySelectorAll('.message, .system-note').forEach(n => n.remove()); }
-        else alert(data.error || 'パスワードが違います');
-      }catch(e){ console.error(e); }
-    }
+$("#togUsers").onclick = ()=>{ const p=$("#userpane"); p.style.display = p.style.display==="none"?"":"none"; };
 
-    /* Admin login flow */
-    async function adminLoginFlow(){
-      const password = prompt('管理者パスワードを入力してください');
-      if(!password) return;
-      try{
-        const res = await fetch(BASE + '/api/admin-login', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ password })
-        });
-        const data = await res.json();
-        if(res.ok && data.ok){
-          adminRedirectUrl = data.url || null;
-          alert('管理者ログインに成功しました。管理ボタンが表示されます。');
-          adminModalBtn.style.display = adminRedirectUrl ? 'inline-block' : 'inline-block';
-          banToggleLabel.style.display = 'flex';
-          const r = await fetch(BASE + '/api/admins');
-          if(r.ok) adminList = await r.json();
-          chatColumn.querySelectorAll('.message, .system-note').forEach(n => n.remove());
-          messages.forEach(m => appendMessageElement(m));
-        } else {
-          alert(data.error || 'パスワードが違います');
-        }
-      }catch(e){ console.error(e); alert('ログインに失敗しました'); }
-    }
+sb.auth.onAuthStateChange((e)=>{ if(e==="SIGNED_OUT"){ location.reload(); }});
 
-    adminLoginBtn.addEventListener('click', adminLoginFlow);
-    adminModalBtn.addEventListener('click', () => { if(adminRedirectUrl) window.open(adminRedirectUrl, '_blank'); });
-
-    banToggle.addEventListener('change', () => {
-      chatColumn.querySelectorAll('.message, .system-note').forEach(n => n.remove());
-      messages.forEach(m => appendMessageElement(m));
-    });
-
-    /* Socket handlers */
-    socket.on('connect', () => {});
-    
-    // 追加: サーバーからのエラー通知ハンドラ
-    socket.on('serverError', (msg) => {
-      showError(msg);
-    });
-    
-    socket.on('serverMessage', (msg) => {
-      alert(msg);
-    });
-
-    socket.on('banned', (data) => {
-      const myUsername = usernameInput.value.trim() || '匿名';
-      const mySeed = seedInput.value.trim() || '';
-      if (data.username === myUsername && data.seed === mySeed) {
-        document.body.innerHTML = '<div style="display:flex;justify-content:center;align-items:center;height:100vh;font-size:24px;font-weight:bold;background:var(--bg);color:var(--text);">あなたはチャットから退出させられました。</div>';
-        socket.disconnect();
-      }
-    });
-
-    socket.on('newMessage', (msg) => {
-      messages.push(msg);
-      appendMessageElement(msg);
-    });
-
-    socket.on('updateReaction', ({ messageId, reactions }) => {
-      const el = chatColumn.querySelector(`[data-id="${messageId}"]`);
-      if(!el) return;
-      const reactionsEl = el.querySelector('.reactions');
-      if(!reactionsEl) return;
-      reactionsEl.innerHTML = '';
-      Object.keys(reactions).forEach(k => {
-        const count = reactions[k] || 0;
-        reactionsEl.appendChild(createReactionButton(k, count, messageId));
-      });
-    });
-
-    socket.on('clearMessages', () => {
-      messages = [];
-      chatColumn.querySelectorAll('.message, .system-note').forEach(n => n.remove());
-    });
-
-    socket.on('adminUpdate', (list) => {
-      adminList = Array.isArray(list) ? list : [];
-      chatColumn.querySelectorAll('.message, .system-note').forEach(n => n.remove());
-      messages.forEach(m => appendMessageElement(m));
-    });
-
-    /* Othello Logic */
-    async function fetchRooms(){
-      try{
-        const res = await fetch(BASE + '/api/rooms');
-        if(!res.ok) throw new Error('failed');
-        const list = await res.json();
-        renderRooms(list);
-      }catch(e){ console.error(e); roomsList.innerHTML = '<div class="info">ルーム一覧の取得に失敗しました</div>'; }
-    }
-
-    function renderRooms(list){
-      roomsList.innerHTML = '';
-      if(list.length === 0){ roomsList.innerHTML = '<div class="info">現在作成された部屋はありません。</div>'; return; }
-      list.forEach(r => {
-        const item = document.createElement('div'); item.className = 'room-item';
-        const left = document.createElement('div');
-        left.innerHTML = `<div style="font-weight:700">${escapeHtml(r.id)}</div><div class="info">${r.players.length ? escapeHtml(r.players.join(', ')) + ' が待機中です。' : '待機中のプレイヤーはいません。'}</div>`;
-        const right = document.createElement('div');
-        const joinBtn = document.createElement('button'); joinBtn.className = 'btn'; joinBtn.textContent = '参加';
-        joinBtn.addEventListener('click', () => { const username = usernameInput.value.trim() || '匿名'; socket.emit('joinGame', { roomId: r.id, username }); openRoom(r.id); });
-        const watchBtn = document.createElement('button'); watchBtn.className = 'btn ghost'; watchBtn.textContent = '観戦';
-        watchBtn.addEventListener('click', () => openRoom(r.id, true));
-        right.appendChild(joinBtn); right.appendChild(watchBtn);
-        item.appendChild(left); item.appendChild(right);
-        roomsList.appendChild(item);
-      });
-    }
-
-    createRoomBtn.addEventListener('click', () => {
-      const id = roomInput.value.trim() || ('room-' + Math.random().toString(36).slice(2,8));
-      const username = usernameInput.value.trim() || '匿名';
-      socket.emit('createGame', { roomId: id, username });
-      openRoom(id);
-    });
-
-    refreshRoomsBtn.addEventListener('click', fetchRooms);
-
-    function openRoom(roomId){
-      currentRoom = roomId;
-      socket.emit('joinRoom', { roomId, username: usernameInput.value.trim() || '匿名' });
-      socket.emit('requestGameState', { roomId });
-      othelloPanel.style.display = 'block';
-      othelloPanel.setAttribute('aria-hidden','false');
-      document.getElementById('splitContainer').classList.add('split');
-      currentRoomLabel.textContent = '部屋: ' + roomId;
-      roomsControls.style.display = 'block';
-      fetchRooms();
-    }
-
-    // 追加: 部屋が強制削除された際のハンドリング
-    socket.on('roomClosed', () => {
-      if(leaveRoomBtn) leaveRoomBtn.click();
-      fetchRooms();
-    });
-
-    leaveRoomBtn.addEventListener('click', () => {
-      if(!currentRoom) return;
-      socket.emit('leaveRoom', { roomId: currentRoom });
-      currentRoom = null;
-      gameArea.style.display = 'none';
-      othelloPanel.style.display = 'none';
-      othelloPanel.setAttribute('aria-hidden','true');
-      document.getElementById('splitContainer').classList.remove('split');
-      roomsControls.style.display = 'block';
-      hideResult();
-    });
-
-    function buildBoard(){
-      boardEl.innerHTML = '';
-      for(let r=0;r<8;r++){
-        for(let c=0;c<8;c++){
-          const cell = document.createElement('div'); cell.className = 'cell'; cell.dataset.r = r; cell.dataset.c = c;
-          cell.addEventListener('click', () => onCellClick(r,c));
-          boardEl.appendChild(cell);
-        }
-      }
-    }
-
-    function clearLegalDots(){
-      for(let i=0;i<64;i++){
-        const cell = boardEl.children[i];
-        const dot = cell.querySelector('.legal-dot');
-        if(dot) dot.remove();
-      }
-    }
-
-    function renderBoard(board, lastMove, legalMoves){
-      for(let r=0;r<8;r++){
-        for(let c=0;c<8;c++){
-          const idx = r*8 + c;
-          const cell = boardEl.children[idx];
-          cell.innerHTML = '';
-          cell.classList.remove('last-move');
-          if(lastMove && lastMove.r === r && lastMove.c === c) cell.classList.add('last-move');
-          if(board[r][c] === 1){ const d = document.createElement('div'); d.className = 'disc black'; cell.appendChild(d); }
-          else if(board[r][c] === 2){ const d = document.createElement('div'); d.className = 'disc white'; cell.appendChild(d); }
-        }
-      }
-      clearLegalDots();
-      if(Array.isArray(legalMoves)){
-        legalMoves.forEach(([r,c]) => {
-          const idx = r*8 + c;
-          const cell = boardEl.children[idx];
-          const dot = document.createElement('div'); dot.className = 'legal-dot';
-          cell.appendChild(dot);
-        });
-      }
-    }
-
-    function updateGameState(g){
-      gameState = g;
-      statusLabel.textContent = '状態: ' + g.status;
-      countsLabel.textContent = `黒: ${g.counts ? g.counts.black : 0} / 白: ${g.counts ? g.counts.white : 0}`;
-      const p1 = g.players && g.players[1] ? g.players[1] : '-';
-      const p2 = g.players && g.players[2] ? g.players[2] : '-';
-      playersLabel.textContent = `黒: ${p1} / 白: ${p2}`;
-
-      const me = usernameInput.value.trim() || '匿名';
-      if(g.players){
-        if(g.players[1] === me) myColor = 1;
-        else if(g.players[2] === me) myColor = 2;
-        else myColor = null;
-      } else myColor = null;
-
-      if(g.status === 'playing'){
-        roomsControls.style.display = 'none';
-        gameArea.style.display = 'block';
-        if(g.turn === 1){ turnBadge.textContent = '黒'; turnBadge.className = 'badge black'; }
-        else if(g.turn === 2){ turnBadge.textContent = '白'; turnBadge.className = 'badge white'; }
-        else { turnBadge.textContent = '-'; turnBadge.className = 'badge'; }
-        if(myColor){ joinGameBtn.disabled = true; joinGameBtn.textContent = (myColor===1 ? 'あなた: 黒' : 'あなた: 白'); }
-        else { joinGameBtn.disabled = true; joinGameBtn.textContent = '観戦中'; }
-      } else if(g.status === 'waiting'){
-        roomsControls.style.display = 'block';
-        gameArea.style.display = 'block';
-        joinGameBtn.disabled = false;
-        joinGameBtn.textContent = '対戦参加';
-        turnBadge.textContent = '-';
-        turnBadge.className = 'badge';
-        hideResult();
-      } else if(g.status === 'finished'){
-        roomsControls.style.display = 'none';
-        gameArea.style.display = 'block';
-        showResult(g);
-      }
-      renderBoard(g.board, g.lastMove, g.legalMoves || []);
-      updateCellInteractivity();
-    }
-
-    function updateCellInteractivity(){
-      const isPlayerTurn = gameState && gameState.status === 'playing' && myColor && gameState.turn === myColor;
-      for(let i=0;i<64;i++){
-        const cell = boardEl.children[i];
-        if(!cell) continue;
-        if(!myColor || !isPlayerTurn) cell.classList.add('disabled'); else cell.classList.remove('disabled');
-      }
-    }
-
-    function onCellClick(r,c){
-      if(!gameState || gameState.status !== 'playing'){ showError('対戦中ではありません'); return; }
-      if(!myColor){ showError('観戦中です。'); return; }
-      if(gameState.turn !== myColor){ showError('あなたの手番ではありません'); return; }
-      const legal = (gameState.legalMoves || []).some(([rr,cc]) => rr===r && cc===c);
-      if(!legal) return;
-      socket.emit('makeMove', { roomId: currentRoom, r, c, color: myColor });
-    }
-
-    joinGameBtn.addEventListener('click', () => {
-      if(!currentRoom) { showError('先に部屋を開いてください'); return; }
-      socket.emit('joinGame', { roomId: currentRoom, username: usernameInput.value.trim() || '匿名' });
-      joinGameBtn.disabled = true;
-      joinGameBtn.textContent = '参加リクエスト中';
-    });
-
-    socket.on('roomUpdate', ({ players, roomId }) => {
-      if(roomId === currentRoom) playersLabel.textContent = '参加者: ' + (players.join(', ') || '-');
-      fetchRooms();
-    });
-
-    socket.on('gameState', (g) => {
-      updateGameState(g);
-    });
-
-    function showResult(g){
-      overlay.style.display = 'flex';
-      overlay.innerHTML = '';
-      const card = document.createElement('div');
-      const me = usernameInput.value.trim() || '匿名';
-      let resultClass = 'lose', title = 'Lose...', sub = '残念でした';
-      if(g.winner === 0){
-        resultClass = 'win'; title = 'Draw'; sub = `引き分けです。黒 ${g.counts.black} - 白 ${g.counts.white}`;
-      } else {
-        const winnerName = (g.players && g.players[g.winner]) ? g.players[g.winner] : (g.winner===1 ? '黒' : '白');
-        if((g.winner === 1 && myColor === 1) || (g.winner === 2 && myColor === 2)){
-          resultClass = 'win'; title = 'Congratulation!'; sub = `勝利しました。${winnerName} が勝者です。`;
-        } else {
-          resultClass = 'lose'; title = 'Lose...'; sub = `敗北しました。勝者: ${winnerName}`;
-        }
-      }
-      card.className = `result-card ${resultClass}`;
-      card.innerHTML = `<div class="result-title">${title}</div><div class="result-sub">${sub}</div>`;
-      overlay.appendChild(card);
-      setTimeout(hideResult, 8000);
-    }
-    function hideResult(){ overlay.style.display = 'none'; overlay.innerHTML = ''; }
-
-    /* Initial load */
-    buildBoard();
-    loadMessages();
-    fetchRooms();
-
-    /* UI bindings */
-    sendBtn.addEventListener('click', postMessage);
-    messageInput.addEventListener('keydown', (e) => { if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); postMessage(); } });
-    clearBtn.addEventListener('click', clearAll);
-    toggleOthelloBtn.addEventListener('click', () => {
-      if(othelloPanel.style.display === 'none' || othelloPanel.style.display === ''){ othelloPanel.style.display = 'block'; document.getElementById('splitContainer').classList.add('split'); }
-      else { othelloPanel.style.display = 'none'; document.getElementById('splitContainer').classList.remove('split'); }
-    });
-
-    (async () => {
-      try{
-        const res = await fetch(BASE + '/api/admins');
-        if(res.ok) adminList = await res.json();
-      }catch(e){}
-    })();
-  </script>
+boot();
+</script>
 </body>
 </html>
