@@ -6,7 +6,7 @@
 <meta name="referrer" content="no-referrer" />
 <meta http-equiv="Content-Security-Policy"
   content="default-src 'self'; script-src 'self' 'unsafe-inline' https://esm.sh; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://esm.sh; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self';" />
-<title>min-chat3</title>
+<title>min-chat</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&family=Inter:wght@400;600;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -59,7 +59,7 @@
   /* main */
   #content{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 360px 280px;min-height:0;max-width:1700px;width:100%;margin:0 auto}
   #chatpane{display:flex;flex-direction:column;min-width:0;min-height:0}
-  #chat{flex:1;overflow-y:auto;padding:24px 0 4px;scroll-behavior:smooth}
+  #chat{flex:1;overflow-y:auto;padding:24px 0 4px;scroll-behavior:auto}
 
   /* member list */
   #userpane{overflow:auto;padding:24px 14px;border-left:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.012),transparent 30%)}
@@ -123,7 +123,7 @@
   .tdots i:nth-child(2){animation-delay:.15s}
   .tdots i:nth-child(3){animation-delay:.3s}
   @keyframes tbl{0%,80%,100%{transform:translateY(0);opacity:.35}40%{transform:translateY(-3px);opacity:1}}
-  .reads{margin:2px 0 8px 76px;font-size:10px;color:var(--gold);font-family:"JetBrains Mono",Consolas,monospace;letter-spacing:1.2px;font-weight:700;opacity:.85;text-transform:uppercase;display:flex;align-items:center;gap:6px}
+  .reads{width:fit-content;margin:4px 24px 8px auto;font-size:10px;color:var(--gold);font-family:"JetBrains Mono",Consolas,monospace;letter-spacing:1.2px;font-weight:700;opacity:.85;text-transform:uppercase;display:flex;align-items:center;justify-content:flex-end;gap:6px;text-align:right}
   .reads::before{content:"✓✓";color:var(--gold);font-size:11px}
 
   /* command palette */
@@ -308,6 +308,7 @@
   .msg.own .mact{left:auto;right:24px}
   .msg.own .ts-inline{display:none}
   .msg.own .replyQ{text-align:left}
+  .msg.own + .reads{margin-right:24px;margin-left:auto}
   .msg.own.private .text{color:#fde68a;background:linear-gradient(180deg,#3a2e0a,#1f1505);border-color:rgba(245,158,11,.4)}
 
   /* new message floating badge */
@@ -348,7 +349,7 @@
 <div id="auth">
   <div class="card">
     <h1>MIN<span class="accent">3</span></h1>
-    <div class="sub">made by nemu :D</div>
+    <div class="sub">Encrypted Chat Lounge</div>
     <div class="tabs">
       <button id="t-login" class="on">ログイン</button>
       <button id="t-signup">アカウント作成</button>
@@ -363,7 +364,7 @@
       ・名前は 1〜24 文字（日本語OK・記号は <code>_</code> <code>-</code> のみ）<br>
       ・パスワードは 8 文字以上<br>
       ・名前の重複は不可<br>
-      ・アカウントを作成して始めましょう
+      ・ログインしない限りチャットは一切表示されません
     </div>
   </div>
 </div>
@@ -468,7 +469,8 @@ const nameToEmail = n => "u_" + btoa(unescape(encodeURIComponent(n))).replace(/[
 let me=null, myIgnores=new Set(), chCh=null, prCh=null, presCh=null, sysCh=null, gameCh=null, gameMsgCh=null;
 let reconnectTimer=null, reconnectDelay=1000;
 let lastSenderId=null, lastSenderTime=0;
-let booted=false, sending=false, currentRoom=1, gameSnapshot=null, healthBusy=false;
+let booted=false, sending=false, currentRoom=1, gameSnapshot=null, healthBusy=false, accessToken="";
+let initialLoadingMessages=false, ignoreScrollUntil=0, readBadgeTimer=null, usersRenderTimer=null, gameLoadTimer=null;
 const COLOR_PRESETS = ["#ffffff","#60a5fa","#22c55e","#f43f5e","#f59e0b","#a78bfa","#14b8a6","#f472b6","#94a3b8","#ef4444","#3b82f6","#10b981"];
 // r = 必要権限 ランク (1:user 2:deleter 3:admin 4:founder)
 const COMMANDS = [
@@ -551,6 +553,7 @@ $("#a-go").onclick = async () => {
 async function boot(){
   const { data:{ session } } = await sb.auth.getSession();
   if(!session){ $("#auth").style.display="flex"; $("#app").classList.remove("on"); return; }
+  accessToken = session.access_token || "";
   const { data, error } = await sb.rpc("login_check");
   if(error){ $("#a-err").textContent = error.message; return; }
   if(!data.ok){
@@ -569,21 +572,20 @@ async function boot(){
   $("#app").classList.add("on");
   renderMe();
   await loadIgnores();
-  await loadMessages();
+  await loadMessages(true);
   await loadUsers();
   await loadTopic();
   await loadGame();
   subscribe();
   if(!booted){
     booted = true;
-    setInterval(pruneExpiredPrivate, 30000);
+    setInterval(pruneExpiredPrivate, 60000);
     $("#chat").addEventListener("scroll", ()=>{
       const c=$("#chat");
-      if(c.scrollHeight - c.scrollTop - c.clientHeight < 60) hideNewBadge();
-      scheduleReadSync();
+      if(isNearBottom(80)){ hideNewBadge(); clearUnread(); scheduleReadSync(); }
     }, { passive:true });
     window.addEventListener("focus", ()=>{ scheduleReadSync(); clearUnread(); });
-    window.addEventListener("pagehide", stopTyping);
+    window.addEventListener("pagehide", ()=>{ stopTyping(); leaveMyRoom(true); });
     $("#newbadge").onclick = ()=>{ $("#chat").scrollTop = $("#chat").scrollHeight; hideNewBadge(); clearUnread(); };
   }
   $("#inp").focus();
@@ -615,6 +617,7 @@ function renderMe(){
     </div>`;
 }
 async function doLogout(){
+  await leaveMyRoom(false).catch(()=>{});
   try{ await sb.auth.signOut(); }catch{}
   // Reset all in-memory state without page reload
   if(chCh) sb.removeChannel(chCh); if(prCh) sb.removeChannel(prCh);
@@ -634,13 +637,20 @@ async function loadIgnores(){
   myIgnores = new Set((data||[]).map(x=>x.target_user_id));
 }
 
-async function loadMessages(){
+async function loadMessages(forceBottom=false){
+  const c = $("#chat");
+  const keepTop = c.scrollTop;
+  initialLoadingMessages = true;
   const { data, error } = await sb.from("messages").select("*").order("id",{ascending:true}).limit(200);
-  if(error){ console.error(error); return; }
-  $("#chat").innerHTML="";
+  if(error){ console.error(error); initialLoadingMessages = false; return; }
+  c.innerHTML="";
+  msgIndex.clear(); latestMsgId=0; myLastRead=0; reads.clear();
   lastSenderId=null; lastSenderTime=0;
   (data||[]).forEach(addMsg);
-  scrollBot(true);
+  initialLoadingMessages = false;
+  updateReadBadges();
+  if(forceBottom) scrollBot(true);
+  else c.scrollTop = Math.min(keepTop, c.scrollHeight);
 }
 
 let profilesMap = new Map(); // user_id -> profile
@@ -652,6 +662,7 @@ async function loadUsers(){
 }
 function renderUsers(){
   const ul = $("#userlist"); ul.innerHTML="";
+  if(me) presenceSet.add(me.user_id);
   const list = [...presenceSet].map(id=>profilesMap.get(id)).filter(Boolean);
   const rank = r => r==="founder"?4:r==="admin"?3:r==="deleter"?2:1;
   list.sort((a,b)=>rank(b.role)-rank(a.role) || a.name.localeCompare(b.name,"ja"));
@@ -667,6 +678,10 @@ function renderUsers(){
     ul.appendChild(d);
   });
   $("#cnt").textContent = String(list.length).padStart(2,"0");
+}
+function scheduleRenderUsers(){
+  if(usersRenderTimer) return;
+  usersRenderTimer = setTimeout(()=>{ usersRenderTimer=null; renderUsers(); }, 120);
 }
 
 async function loadTopic(){
@@ -736,6 +751,7 @@ function addMsg(m){
   if(m.hidden_global) return;
   if(myIgnores.has(m.user_id)) return;
   if(m.kind==="private" && m.user_id!==me.user_id && m.target_user_id!==me.user_id) return;
+  const wasNearBottom = isNearBottom(80);
 
   const t = new Date(m.created_at).getTime();
   if(m.kind==="private" && Date.now()-t > 10*60*1000) return;
@@ -799,17 +815,17 @@ function addMsg(m){
   });
   $("#chat").appendChild(el);
   if(m.id > latestMsgId) latestMsgId = m.id;
-  // Unread counters (only when not focused or scrolled away)
-  const c=$("#chat");
-  const atBottom = c.scrollHeight - c.scrollTop - c.clientHeight < 80;
-  if(!isOwn && (document.hidden || !atBottom)){
+  if(initialLoadingMessages) return;
+  if(isOwn){ scrollToMessage(el); scheduleReadSync(); return; }
+  // 新着は勝手にスクロールせず、バッジとタイトルで知らせる
+  if(document.hidden || wasNearBottom || !isNearBottom(80)){
     unreadCount++;
     if(repliedToMe) unreadReplies++;
     updateTabTitle();
-    if(!atBottom) showNewBadge();
+    if(!document.hidden) showNewBadge();
   }
   scheduleReadSync();
-  updateReadBadges();
+  scheduleReadBadgeUpdate();
 }
 
 function replaceMsg(m){
@@ -864,10 +880,10 @@ function handleMsgAction(act, m, el){
 
 function scrollBot(force){
   const c=$("#chat");
-  // tighter threshold so we don't auto-yank the user back to the bottom
-  const near = c.scrollHeight - c.scrollTop - c.clientHeight < 60;
-  if(force || near){ c.scrollTop = c.scrollHeight; scheduleReadSync(); hideNewBadge(); }
+  if(force){ ignoreScrollUntil=Date.now()+250; c.scrollTop = c.scrollHeight; scheduleReadSync(); hideNewBadge(); }
 }
+function isNearBottom(px=80){ const c=$("#chat"); return c.scrollHeight - c.scrollTop - c.clientHeight < px; }
+function scrollToMessage(el){ ignoreScrollUntil=Date.now()+250; el.scrollIntoView({block:"end", inline:"nearest"}); hideNewBadge(); }
 
 function showNewBadge(){ const b=$("#newbadge"); if(b) b.classList.add("on"); }
 function hideNewBadge(){ const b=$("#newbadge"); if(b) b.classList.remove("on"); }
@@ -900,7 +916,7 @@ function scheduleReconnect(reason){
 function subscribe(){
   if(chCh) sb.removeChannel(chCh);
   chCh = sb.channel("messages-rt")
-    .on("postgres_changes",{event:"INSERT",schema:"public",table:"messages"}, p=>{ addMsg(p.new); scrollBot(); })
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"messages"}, p=>{ addMsg(p.new); })
     .on("postgres_changes",{event:"UPDATE",schema:"public",table:"messages"}, p=>{ replaceMsg(p.new); })
     .on("postgres_changes",{event:"DELETE",schema:"public",table:"messages"}, p=>{
       const el=document.querySelector(`.msg[data-id="${p.old.id}"]`); if(el) el.remove();
@@ -925,7 +941,7 @@ function subscribe(){
   presCh.on("presence",{event:"sync"}, ()=>{
     const state = presCh.presenceState();
     presenceSet = new Set(Object.keys(state));
-    renderUsers();
+    scheduleRenderUsers();
   });
   presCh.subscribe(async s=>{
     if(s==="SUBSCRIBED"){
@@ -944,8 +960,8 @@ function subscribe(){
 
   if(gameCh) sb.removeChannel(gameCh);
   gameCh = sb.channel("games-rt")
-    .on("postgres_changes",{event:"*",schema:"public",table:"game_rooms"}, loadGame)
-    .on("postgres_changes",{event:"*",schema:"public",table:"game_room_members"}, loadGame)
+    .on("postgres_changes",{event:"*",schema:"public",table:"game_rooms"}, scheduleLoadGame)
+    .on("postgres_changes",{event:"*",schema:"public",table:"game_room_members"}, scheduleLoadGame)
     .subscribe();
   if(gameMsgCh) sb.removeChannel(gameMsgCh);
   gameMsgCh = sb.channel("game-msgs-rt")
@@ -1027,7 +1043,7 @@ function setupReads(){
     if(!payload || payload.id===me.user_id) return;
     if(myIgnores.has(payload.id)) return;
     const prev = reads.get(payload.id)||0;
-    if(payload.n > prev){ reads.set(payload.id, payload.n); updateReadBadges(); }
+    if(payload.n > prev){ reads.set(payload.id, payload.n); scheduleReadBadgeUpdate(); }
   });
   rdCh.on("broadcast",{event:"hi"}, ()=>{ // newcomer: rebroadcast current
     if(myLastRead) sendRead(true);
@@ -1044,14 +1060,19 @@ function scheduleReadSync(){
   if(readSyncTimer) return;
   readSyncTimer = setTimeout(()=>{
     readSyncTimer=null;
+    if(Date.now() < ignoreScrollUntil) return;
     const c=$("#chat");
     const atBottom = c.scrollHeight - c.scrollTop - c.clientHeight < 120;
     if(atBottom && latestMsgId>myLastRead){
       myLastRead = latestMsgId;
       sendRead(false);
-      updateReadBadges();
+      scheduleReadBadgeUpdate();
     }
   }, 400);
+}
+function scheduleReadBadgeUpdate(){
+  if(readBadgeTimer) return;
+  readBadgeTimer = setTimeout(()=>{ readBadgeTimer=null; updateReadBadges(); }, 250);
 }
 function sendRead(force){
   if(!rdCh||!me||!myLastRead) return;
@@ -1113,6 +1134,10 @@ async function loadGame(){
   gameSnapshot = data; currentRoom = data.myRoom || currentRoom || 1;
   renderRooms(); await loadRoomMessages();
 }
+function scheduleLoadGame(){
+  if(gameLoadTimer) return;
+  gameLoadTimer = setTimeout(()=>{ gameLoadTimer=null; loadGame(); }, 250);
+}
 function renderRooms(){
   const wrap=$("#rooms"); if(!gameSnapshot){ wrap.innerHTML=""; return; }
   $("#gstatus").textContent = gameSnapshot.myRoom ? `ROOM ${gameSnapshot.myRoom}に参加中` : "未入室";
@@ -1169,7 +1194,17 @@ function renderGameState(r){
 async function rpcGame(fn,args){ const {data,error}=await sb.rpc(fn,args); if(error||!data?.ok) flash(error?.message||data?.error||"失敗"); await loadGame(); }
 async function joinRoom(id,play){ currentRoom=id; await rpcGame("join_game_room",{p_room_id:id,p_play:play}); }
 async function gameAct(id,action,payload){ await rpcGame("game_action",{p_room_id:id,p_action:action,p_payload:payload}); }
-async function loadRoomMessages(){ const {data}=await sb.from("game_room_messages").select("*").eq("room_id",currentRoom).order("id",{ascending:true}).limit(80); $("#roommsgs").innerHTML=""; (data||[]).forEach(addRoomMsg); }
+async function leaveMyRoom(keepalive=false){
+  const room = gameSnapshot?.myRoom || currentRoom;
+  if(!room || !accessToken) return;
+  if(keepalive && navigator.sendBeacon){
+    const body = new Blob([JSON.stringify({ room_id: room, access_token: accessToken })], { type:"application/json" });
+    navigator.sendBeacon("/api/public/leave-game-room", body);
+    return;
+  }
+  await sb.rpc("leave_game_room", { p_room_id: room });
+}
+async function loadRoomMessages(){ const {data}=await sb.from("game_room_messages").select("*").eq("room_id",currentRoom).order("id",{ascending:true}).limit(80); $("#roommsgs").innerHTML=""; $("#gv-rmsgs").innerHTML=""; (data||[]).forEach(addRoomMsg); }
 function addRoomMsg(m){ const box=$("#roommsgs"); const d=document.createElement("div"); d.className="rmsg"; d.innerHTML=`<span class="rn">${nameHtml(m.name_snapshot,m.color_snapshot)}</span> ${esc(stripCtl(m.content))}`; box.appendChild(d); box.scrollTop=box.scrollHeight; }
 
 // Command palette
@@ -1471,15 +1506,13 @@ const _loadGameOrig = loadGame;
 loadGame = async function(){
   await _loadGameOrig();
   renderGameView();
-  // mirror room messages into gv pane
-  const {data}=await sb.from("game_room_messages").select("*").eq("room_id",currentRoom).order("id",{ascending:true}).limit(80);
-  $("#gv-rmsgs").innerHTML=""; (data||[]).forEach(addGvRoomMsg);
 };
 // Also mirror INSERTs from realtime
 const _addRoomOrig = addRoomMsg;
 addRoomMsg = function(m){ _addRoomOrig(m); addGvRoomMsg(m); };
 
-sb.auth.onAuthStateChange((e)=>{
+sb.auth.onAuthStateChange((e, session)=>{
+  accessToken = session?.access_token || accessToken;
   if(e==="SIGNED_OUT" && me){ doLogout(); }
 });
 
